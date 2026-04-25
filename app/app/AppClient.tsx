@@ -690,7 +690,7 @@ function Header({ role, view, setView, theses, heiContext }) {
         <div className="flex items-start justify-between flex-wrap gap-6">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div style={{ color: "var(--gold)" }}><Library size={22} strokeWidth={1.5}/></div>
+              <img src="/moeys-seal.png" alt="MoEYS seal" className="h-10 w-auto" />
               <div className="font-mono text-[10px] tracking-[0.25em] uppercase" style={{ color: "var(--ink-faint)" }}>
                 MoEYS · Department of Research & Innovation
               </div>
