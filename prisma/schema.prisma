@@ -1,0 +1,141 @@
+// MoEYS National Thesis Archive — database schema (Phase 2 v1)
+// See: project_phase2_schema.md in the auto-memory for the locked spec.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── HEI (Higher Education Institution) ─────────────────────────────
+
+enum HeiType {
+  PUBLIC
+  PRIVATE
+  INTERNATIONAL
+}
+
+model Hei {
+  id           String   @id @default(cuid())
+  name         String
+  nameKhmer    String?
+  shortCode    String   @unique
+  type         HeiType
+  city         String?
+  contactEmail String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  theses Thesis[]
+
+  @@map("HEI")
+}
+
+// ─── Thesis ─────────────────────────────────────────────────────────
+
+enum DegreeLevel {
+  MASTERS
+  PHD
+}
+
+enum ThesisLanguage {
+  ENGLISH
+  KHMER
+  OTHER
+}
+
+enum ThesisStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum ReleasePolicy {
+  IMMEDIATE
+  DELAY_6M
+  DELAY_1Y
+  DELAY_2Y
+  DELAY_3Y
+  DELAY_5Y
+}
+
+enum ReleaseReason {
+  PATENT
+  PUBLICATION
+  COMMERCIAL
+  SENSITIVE
+  OTHER
+}
+
+enum License {
+  ALL_RIGHTS_RESERVED
+  CC_BY
+  CC_BY_NC
+  CC_BY_NC_ND
+}
+
+enum Visibility {
+  PUBLIC
+  METADATA_ONLY
+  HIDDEN
+}
+
+model Thesis {
+  id String @id @default(cuid())
+
+  // Metadata
+  title         String
+  titleKhmer    String?
+  abstract      String         @db.Text
+  abstractKhmer String?        @db.Text
+  keywords      String[]
+  language      ThesisLanguage
+  pageCount     Int?
+
+  // Author (plain text fields; will link to User in Phase 3)
+  authorFirstName String
+  authorLastName  String
+  authorEmail     String?
+
+  // Academic context
+  degreeLevel       DegreeLevel
+  fieldOfStudy      String
+  defenseYear       Int
+  supervisorName    String
+  coSupervisorNames String[]
+
+  // HEI relationship
+  heiId String
+  hei   Hei    @relation(fields: [heiId], references: [id])
+
+  // Workflow
+  status          ThesisStatus @default(DRAFT)
+  submittedAt     DateTime     @default(now())
+  approvedAt      DateTime?
+  rejectionReason String?      @db.Text
+
+  // Author rights (per locked policy)
+  releasePolicy        ReleasePolicy
+  releaseReason        ReleaseReason?
+  releaseJustification String?        @db.Text
+  publicReleaseAt      DateTime?
+  license              License
+  licenseAcknowledged  Boolean        @default(false)
+  authorshipConfirmed  Boolean        @default(false)
+
+  // Public visibility (daily job updates this)
+  visibility Visibility @default(METADATA_ONLY)
+
+  // PDF storage reference (real R2 keys come in Phase 2.5)
+  pdfFileKey String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

@@ -1,6 +1,12 @@
 import Link from "next/link";
+import { prisma } from "../lib/prisma";
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const [thesesCount, heisCount] = await Promise.all([
+    prisma.thesis.count({ where: { status: "APPROVED" } }),
+    prisma.hei.count({ where: { isActive: true } }),
+  ]);
+
   return (
     <div className="flex flex-1 flex-col bg-white">
       <header className="border-b border-gray-200">
@@ -68,11 +74,11 @@ export default function LandingPage() {
       <section className="border-t border-gray-200 bg-gray-50">
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-6 py-12 text-center md:grid-cols-3">
           <div>
-            <p className="text-3xl font-bold text-gray-900">—</p>
+            <p className="text-3xl font-bold text-gray-900">{thesesCount}</p>
             <p className="text-sm text-gray-600">theses archived</p>
           </div>
           <div>
-            <p className="text-3xl font-bold text-gray-900">—</p>
+            <p className="text-3xl font-bold text-gray-900">{heisCount}</p>
             <p className="text-sm text-gray-600">participating HEIs</p>
           </div>
           <div>
