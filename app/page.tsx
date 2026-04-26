@@ -5,6 +5,21 @@ import { prisma } from "../lib/prisma";
 // the latest archive size as soon as a thesis is approved.
 export const dynamic = "force-dynamic";
 
+// Cambodian palette — keep these in sync with /preview-colors and the /app
+// StyleTag. See the deep-research notes in the conversation memory for why
+// each color was chosen (flag PMS 293 navy, restrained seal red, parchment
+// cream, royal/temple gold).
+const C = {
+  primary: "#0A2A6B",
+  secondary: "#A41E2C",
+  bg: "#F7F1E1",
+  surface: "#FBF7EC",
+  ink: "#2A2018",
+  inkSoft: "#5A4A38",
+  inkFaint: "#8A7860",
+  accent: "#A8761A",
+};
+
 export default async function LandingPage() {
   const [thesesCount, heisCount] = await Promise.all([
     prisma.thesis.count({ where: { status: "APPROVED" } }),
@@ -12,8 +27,8 @@ export default async function LandingPage() {
   ]);
 
   return (
-    <div className="flex flex-1 flex-col bg-white">
-      <header className="border-b border-gray-200">
+    <div className="flex flex-1 flex-col" style={{ background: C.bg, color: C.ink, fontFamily: "Georgia, serif" }}>
+      <header style={{ borderBottom: `1px solid ${C.inkFaint}30`, background: C.surface }}>
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-4">
           <img
             src="/moeys-seal.png"
@@ -21,22 +36,39 @@ export default async function LandingPage() {
             className="h-12 w-auto"
           />
           <div>
-            <p className="text-sm font-semibold text-gray-900">
+            <p className="text-sm font-semibold" style={{ color: C.ink }}>
               Kingdom of Cambodia
             </p>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs" style={{ color: C.inkSoft }}>
               Ministry of Education, Youth and Sport
             </p>
           </div>
         </div>
       </header>
 
-      <section className="flex flex-1 items-center bg-gradient-to-b from-blue-50 to-white">
+      <section className="flex flex-1 items-center">
         <div className="mx-auto w-full max-w-4xl px-6 py-20 text-center">
-          <h1 className="mb-4 text-5xl font-bold tracking-tight text-gray-900">
+          <div
+            className="mb-4 text-xs font-semibold"
+            style={{
+              color: C.inkFaint,
+              letterSpacing: "0.25em",
+              textTransform: "uppercase",
+            }}
+          >
+            National Archive · Pilot programme
+          </div>
+          <h1
+            className="mb-5 text-5xl md:text-6xl"
+            style={{ color: C.ink, fontWeight: 400, lineHeight: 1.1 }}
+          >
+            <span style={{ fontStyle: "italic", fontWeight: 300 }}>The</span>{" "}
             National Thesis Archive
           </h1>
-          <p className="mx-auto mb-10 max-w-2xl text-lg text-gray-600">
+          <p
+            className="mx-auto mb-10 max-w-2xl text-lg"
+            style={{ color: C.inkSoft, lineHeight: 1.6 }}
+          >
             A central catalogue of Master&apos;s and PhD theses from accredited
             Cambodian higher education institutions.
           </p>
@@ -47,27 +79,39 @@ export default async function LandingPage() {
                 type="text"
                 name="q"
                 placeholder="Search by title, author, or keyword…"
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-base shadow-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                className="flex-1 rounded-md px-4 py-3 text-base"
+                style={{
+                  background: C.surface,
+                  border: `1px solid ${C.inkFaint}80`,
+                  color: C.ink,
+                }}
               />
               <button
                 type="submit"
-                className="rounded-lg bg-gray-900 px-6 py-3 font-semibold text-white hover:bg-gray-800"
+                className="rounded-md px-6 py-3 font-semibold transition-opacity hover:opacity-90"
+                style={{ background: C.primary, color: C.bg }}
               >
                 Search
               </button>
             </div>
           </form>
 
-          <div className="flex flex-wrap justify-center gap-4">
+          <div className="flex flex-wrap justify-center gap-3">
             <Link
               href="/app"
-              className="rounded-lg bg-blue-700 px-8 py-3 font-semibold text-white shadow-sm hover:bg-blue-800"
+              className="rounded-md px-7 py-3 font-semibold shadow-sm transition-opacity hover:opacity-90"
+              style={{ background: C.primary, color: C.bg }}
             >
               Browse theses
             </Link>
             <Link
               href="/sign-in"
-              className="rounded-lg border-2 border-blue-700 bg-white px-8 py-3 font-semibold text-blue-700 hover:bg-blue-50"
+              className="rounded-md px-7 py-3 font-semibold transition-colors"
+              style={{
+                background: "transparent",
+                color: C.primary,
+                border: `2px solid ${C.primary}`,
+              }}
             >
               Sign in
             </Link>
@@ -75,25 +119,43 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      <section className="border-t border-gray-200 bg-gray-50">
+      <section
+        style={{
+          background: C.surface,
+          borderTop: `1px solid ${C.inkFaint}30`,
+          borderBottom: `1px solid ${C.inkFaint}30`,
+        }}
+      >
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-6 py-12 text-center md:grid-cols-3">
           <div>
-            <p className="text-3xl font-bold text-gray-900">{thesesCount}</p>
-            <p className="text-sm text-gray-600">theses archived</p>
+            <p className="text-4xl" style={{ color: C.ink, fontWeight: 500 }}>
+              {thesesCount}
+            </p>
+            <p className="mt-1 text-sm" style={{ color: C.inkSoft }}>
+              theses archived
+            </p>
           </div>
           <div>
-            <p className="text-3xl font-bold text-gray-900">{heisCount}</p>
-            <p className="text-sm text-gray-600">participating HEIs</p>
+            <p className="text-4xl" style={{ color: C.ink, fontWeight: 500 }}>
+              {heisCount}
+            </p>
+            <p className="mt-1 text-sm" style={{ color: C.inkSoft }}>
+              participating HEIs
+            </p>
           </div>
           <div>
-            <p className="text-3xl font-bold text-gray-900">MoEYS</p>
-            <p className="text-sm text-gray-600">quality assured</p>
+            <p className="text-4xl" style={{ color: C.accent, fontWeight: 500 }}>
+              MoEYS
+            </p>
+            <p className="mt-1 text-sm" style={{ color: C.inkSoft }}>
+              quality assured
+            </p>
           </div>
         </div>
       </section>
 
-      <footer className="border-t border-gray-200 bg-white">
-        <div className="mx-auto max-w-6xl px-6 py-6 text-sm text-gray-500">
+      <footer style={{ borderTop: `1px solid ${C.inkFaint}30` }}>
+        <div className="mx-auto max-w-6xl px-6 py-6 text-sm" style={{ color: C.inkFaint }}>
           <p>© 2026 Ministry of Education, Youth and Sport · Pilot programme</p>
         </div>
       </footer>

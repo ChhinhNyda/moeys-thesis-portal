@@ -603,14 +603,18 @@ function StyleTag() {
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=Manrope:wght@300;400;500;600;700&family=Noto+Sans+Khmer:wght@400;500;600&display=swap');
       :root {
-        --bg: #F6F1E8; --bg-card: #FBF7EF; --bg-deep: #EDE5D3;
-        --ink: #1E1A16; --ink-soft: #4A413A; --ink-faint: #857A70;
-        --line: #E3DACB; --line-strong: #C9BDA8;
-        --accent: #7A1E2E; --accent-soft: #9A3A4C; --accent-ink: #FBF7EF;
-        --gold: #B08538; --gold-soft: #D4B06A;
-        --green: #3D6B4A; --red: #A83232; --blue: #2F6F9A; --orange: #C07020;
-        --shadow: 0 1px 2px rgba(30,26,22,.04), 0 2px 6px rgba(30,26,22,.03);
-        --shadow-lg: 0 4px 12px rgba(30,26,22,.06), 0 12px 32px rgba(30,26,22,.08);
+        /* Cambodian palette — aligned with /preview-colors and the landing page.
+           Primary is the flag-derived royal navy (PMS 293), accent is royal gold
+           from the Khmer royal arms / Angkor stonework. Seal red is held in
+           reserve for danger states only — see palette research notes. */
+        --bg: #F7F1E1; --bg-card: #FBF7EC; --bg-deep: #ECE3CA;
+        --ink: #2A2018; --ink-soft: #5A4A38; --ink-faint: #8A7860;
+        --line: #E3D9C2; --line-strong: #C9BDA0;
+        --accent: #0A2A6B; --accent-soft: #1F3A7B; --accent-ink: #FBF7EC;
+        --gold: #A8761A; --gold-soft: #C4944A;
+        --green: #2E6B3E; --red: #A41E2C; --blue: #2F6F9A; --orange: #B8771A;
+        --shadow: 0 1px 2px rgba(42,32,24,.04), 0 2px 6px rgba(42,32,24,.03);
+        --shadow-lg: 0 4px 12px rgba(42,32,24,.06), 0 12px 32px rgba(42,32,24,.08);
       }
       html, body, #root { background: var(--bg); }
       body { font-family: 'Manrope', -apple-system, sans-serif; color: var(--ink); }
