@@ -779,7 +779,9 @@ function Header({ role, view, setView, theses, heiContext }) {
         <div className="flex items-start justify-between flex-wrap gap-6">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <img src="/moeys-seal.png" alt="MoEYS seal" className="h-10 w-auto" />
+              <a href="/" title="Back to landing page" className="inline-block hover:opacity-80 transition-opacity">
+                <img src="/moeys-seal.png" alt="MoEYS seal — return to landing page" className="h-10 w-auto" />
+              </a>
               <div className="font-mono text-[10px] tracking-[0.25em] uppercase" style={{ color: "var(--ink-faint)" }}>
                 MoEYS · Department of Research & Innovation
               </div>
