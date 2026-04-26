@@ -304,51 +304,109 @@ export default function AppClient({ initialTheses, initialHeis }) {
     if (opts.toast) showToast(opts.toast);
   };
 
+  // Build the JSON payload sent to POST /api/theses. The form's `data` object
+  // matches the prototype's shape; the server adapts it to the DB schema.
+  const buildThesisPayload = (data, intent) => ({
+    intent,
+    titleEn: data.titleEn,
+    titleKh: data.titleKh,
+    author: data.author,
+    authorEmail: data.submittedBy || undefined,
+    hei: data.hei,
+    faculty: data.faculty,
+    degree: data.degree,
+    year: data.year,
+    supervisor: data.supervisor,
+    language: data.language,
+    abstract: data.abstract,
+    keywords: data.keywords,
+    accessLevel: data.accessLevel,
+    embargoUntil: data.embargoUntil,
+  });
+
   const submitThesis = async (data) => {
-    const now = new Date().toISOString().slice(0,10);
-    const newItem = {
-      ...data,
-      id: data.id || `t_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
-      status: "submitted",
-      submittedAt: now,
-      submittedBy: `${heiContext.toLowerCase()}.admin@${heiContext.toLowerCase()}.edu.kh`,
-      history: [
-        ...(data.history || []),
-        { at: now, by: `${heiContext} Administration`, action: "Submitted to MoEYS for review" },
-      ],
-    };
-    let updated;
-    if (data.id && theses.some(t => t.id === data.id)) {
-      updated = theses.map(t => t.id === data.id ? newItem : t);
-    } else {
-      updated = [newItem, ...theses];
+    try {
+      // 1. Find the actual File object the user selected (held in session cache)
+      const fileMeta = data.files?.thesisMaster;
+      const file = fileMeta?.id ? fileBlobs.get(fileMeta.id) : null;
+      if (!file) {
+        showToast("Thesis PDF is missing — please re-attach it", "error");
+        return;
+      }
+
+      // 2. Create the Thesis row in DB (status=UNDER_REVIEW)
+      const createRes = await fetch("/api/theses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildThesisPayload(data, "submit")),
+      });
+      if (!createRes.ok) {
+        const err = await createRes.json().catch(() => ({}));
+        throw new Error(err.error || `Create failed (${createRes.status})`);
+      }
+      const { id: thesisId } = await createRes.json();
+
+      // 3. Ask the server for a presigned R2 upload URL
+      const urlRes = await fetch("/api/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thesisId, contentType: "application/pdf" }),
+      });
+      if (!urlRes.ok) {
+        const err = await urlRes.json().catch(() => ({}));
+        throw new Error(err.error || `Upload URL failed (${urlRes.status})`);
+      }
+      const { url: uploadUrl, key } = await urlRes.json();
+
+      // 4. PUT the PDF directly to R2 (does not pass through Vercel)
+      const putRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "application/pdf" },
+        body: file,
+      });
+      if (!putRes.ok) {
+        throw new Error(`R2 upload failed (${putRes.status})`);
+      }
+
+      // 5. Tell the server we're done so it sets pdfFileKey on the row
+      const confirmRes = await fetch(`/api/theses/${thesisId}/confirm-upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pdfFileKey: key }),
+      });
+      if (!confirmRes.ok) {
+        const err = await confirmRes.json().catch(() => ({}));
+        throw new Error(err.error || `Confirm failed (${confirmRes.status})`);
+      }
+
+      showToast("Thesis submitted to MoEYS for review");
+      setEditingId(null);
+      setView("hei_dashboard");
+      // Refresh so SSR picks up the new row from DB
+      setTimeout(() => window.location.reload(), 700);
+    } catch (e) {
+      showToast(`Submission failed: ${e.message}`, "error");
     }
-    setTheses(updated);
-    await sSet(STORAGE_THESES, updated);
-    showToast("Thesis submitted for MoEYS review");
-    setEditingId(null);
-    setView("hei_dashboard");
   };
 
   const saveDraft = async (data) => {
-    const newItem = {
-      ...data,
-      id: data.id || `t_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
-      status: "draft",
-      submittedBy: `${heiContext.toLowerCase()}.admin@${heiContext.toLowerCase()}.edu.kh`,
-      history: data.history || [],
-    };
-    let updated;
-    if (data.id && theses.some(t => t.id === data.id)) {
-      updated = theses.map(t => t.id === data.id ? newItem : t);
-    } else {
-      updated = [newItem, ...theses];
+    try {
+      const createRes = await fetch("/api/theses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildThesisPayload(data, "draft")),
+      });
+      if (!createRes.ok) {
+        const err = await createRes.json().catch(() => ({}));
+        throw new Error(err.error || `Save failed (${createRes.status})`);
+      }
+      showToast("Draft saved");
+      setEditingId(null);
+      setView("hei_dashboard");
+      setTimeout(() => window.location.reload(), 700);
+    } catch (e) {
+      showToast(`Save failed: ${e.message}`, "error");
     }
-    setTheses(updated);
-    await sSet(STORAGE_THESES, updated);
-    showToast("Draft saved");
-    setEditingId(null);
-    setView("hei_dashboard");
   };
 
   const reviewDecision = async (id, decision, feedback, checklistState) => {
