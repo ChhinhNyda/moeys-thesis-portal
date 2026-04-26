@@ -24,6 +24,7 @@ function dbThesisToPrototype(t: {
   approvedAt: Date | null;
   publicReleaseAt: Date | null;
   rejectionReason: string | null;
+  pdfFileKey: string | null;
   hei: { shortCode: string };
 }) {
   let protoStatus: string;
@@ -63,6 +64,7 @@ function dbThesisToPrototype(t: {
     embargoUntil:
       t.visibility === "METADATA_ONLY" && t.publicReleaseAt ? ymd(t.publicReleaseAt) : undefined,
     reviewFeedback: t.rejectionReason ?? undefined,
+    pdfFileKey: t.pdfFileKey,
     history: [],
   };
 }

@@ -954,6 +954,32 @@ function ThesisCard({ thesis, hei, onClick, showStatus }) {
 // ======================================================================
 function DetailModal({ thesis, hei, ministry, role, onClose }) {
   const showWorkflow = role !== "public";
+  const canDownload = thesis.pdfFileKey && thesis.accessLevel === "open";
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState(null);
+
+  async function handleDownload() {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const res = await fetch("/api/download-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thesisId: thesis.id }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Download failed (${res.status})`);
+      }
+      const { url } = await res.json();
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      setDownloadError(e.message);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-panel modal-wide" onClick={e => e.stopPropagation()}>
@@ -964,8 +990,20 @@ function DetailModal({ thesis, hei, ministry, role, onClose }) {
               {showWorkflow && <StatusBadge status={thesis.status}/>}
               {thesis.callNumber && <span className="font-mono text-xs" style={{ color: "var(--ink-faint)" }}>{thesis.callNumber}</span>}
             </div>
-            <button onClick={onClose} className="btn-ghost btn" style={{ padding: "6px" }}><X size={16}/></button>
+            <div className="flex items-center gap-2">
+              {canDownload && (
+                <button onClick={handleDownload} disabled={downloading} className="btn btn-primary">
+                  <Download size={14}/> {downloading ? "Preparing…" : "Download PDF"}
+                </button>
+              )}
+              <button onClick={onClose} className="btn-ghost btn" style={{ padding: "6px" }}><X size={16}/></button>
+            </div>
           </div>
+          {downloadError && (
+            <div className="mb-4 text-sm" style={{ color: "var(--red)" }}>
+              <AlertCircle size={14} className="inline mr-1"/> {downloadError}
+            </div>
+          )}
 
           <h2 className="font-display text-2xl md:text-3xl leading-tight mb-2" style={{ fontWeight: 500 }}>{thesis.titleEn}</h2>
           {thesis.titleKh && <div className="font-khmer text-lg mb-6" style={{ color: "var(--ink-soft)" }}>{thesis.titleKh}</div>}
