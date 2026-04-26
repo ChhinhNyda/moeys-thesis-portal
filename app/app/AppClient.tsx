@@ -255,6 +255,7 @@ export default function AppClient({ initialTheses, initialHeis }) {
   const [detailId, setDetailId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [reviewingId, setReviewingId] = useState(null);
+  const [submittedTitle, setSubmittedTitle] = useState("");
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
@@ -381,9 +382,8 @@ export default function AppClient({ initialTheses, initialHeis }) {
 
       showToast("Thesis submitted to MoEYS for review");
       setEditingId(null);
-      setView("hei_dashboard");
-      // Refresh so SSR picks up the new row from DB
-      setTimeout(() => window.location.reload(), 700);
+      setSubmittedTitle(data.titleEn);
+      setView("hei_submitted");
     } catch (e) {
       showToast(`Submission failed: ${e.message}`, "error");
     }
@@ -504,6 +504,13 @@ export default function AppClient({ initialTheses, initialHeis }) {
                 onSubmit={submitThesis}
                 onCancel={() => { setEditingId(null); setView("hei_dashboard"); }}
                 initial={editingThesis}
+              />
+            )}
+            {view === "hei_submitted" && role === "hei" && (
+              <SubmissionConfirmation
+                title={submittedTitle}
+                onViewSubmissions={() => { setSubmittedTitle(""); setView("hei_dashboard"); window.location.reload(); }}
+                onBrowse={() => { setSubmittedTitle(""); setView("browse"); window.location.reload(); }}
               />
             )}
             {view === "review_queue" && role === "reviewer" && (
@@ -1270,6 +1277,49 @@ function HEISection({ title, subtitle, theses, onEdit, onOpenDetail, highlight }
 // ======================================================================
 // SUBMISSION FORM (HEI)
 // ======================================================================
+// ======================================================================
+// SUBMISSION CONFIRMATION
+// Shown after a successful submit; replaces silently dropping the user
+// back on the dashboard. Reassures the HEI submitter and tells them what
+// happens next.
+// ======================================================================
+function SubmissionConfirmation({ title, onViewSubmissions, onBrowse }) {
+  return (
+    <div className="mt-16 max-w-2xl mx-auto text-center">
+      <div className="inline-flex items-center justify-center mb-6" style={{ width: 72, height: 72, borderRadius: "50%", background: "rgba(72,140,80,0.12)", color: "var(--green, #488C50)" }}>
+        <CheckCircle2 size={40} strokeWidth={1.5}/>
+      </div>
+      <h2 className="font-display text-3xl md:text-4xl mb-4" style={{ fontWeight: 400 }}>
+        Thesis <span style={{ fontStyle: "italic", fontWeight: 300 }}>submitted</span>
+      </h2>
+      {title && (
+        <p className="font-display text-lg italic mb-8" style={{ color: "var(--ink-soft)" }}>
+          “{title}”
+        </p>
+      )}
+      <div className="text-left p-8 rounded-lg border space-y-4" style={{ borderColor: "var(--line)", background: "var(--bg-card)" }}>
+        <p className="text-[15px] leading-relaxed" style={{ color: "var(--ink)" }}>
+          Your thesis is now in the MoEYS review process.
+        </p>
+        <p className="text-[15px] leading-relaxed" style={{ color: "var(--ink-soft)" }}>
+          You can check its status on this platform at any time. The MoEYS reviewing committee will approve, request revisions, or reject your submission, and you will see the decision reflected here.
+        </p>
+        <p className="text-[15px] leading-relaxed font-display italic" style={{ color: "var(--ink-soft)" }}>
+          Have a wonderful day.
+        </p>
+      </div>
+      <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
+        <button onClick={onViewSubmissions} className="btn btn-primary">
+          <ClipboardList size={14}/> View my submissions
+        </button>
+        <button onClick={onBrowse} className="btn btn-ghost">
+          <BookOpen size={14}/> Browse the archive
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, initial }) {
   const [form, setForm] = useState(initial || {
     titleEn: "", titleKh: "", author: "", authorKh: "",
@@ -1301,7 +1351,17 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
     setErrors(e); return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = () => { if (validateFull()) onSubmit(form); };
+  const [showErrorBanner, setShowErrorBanner] = useState(false);
+  const handleSubmit = () => {
+    if (validateFull()) {
+      setShowErrorBanner(false);
+      onSubmit(form);
+    } else {
+      setShowErrorBanner(true);
+      // Bring the user back to the top of the form so they can see what's wrong
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
   const handleSaveDraft = () => onSaveDraft(form);
 
   return (
@@ -1321,6 +1381,17 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
         <div className="mb-6 p-5 rounded-lg" style={{ background: "rgba(192,112,32,0.08)", borderLeft: "3px solid var(--orange)" }}>
           <div className="flex items-center gap-2 mb-2 font-mono text-[11px] tracking-[0.15em] uppercase font-semibold" style={{ color: "var(--orange)" }}><MessageSquare size={13}/> MoEYS reviewer feedback</div>
           <div className="text-sm" style={{ color: "var(--ink)" }}>{initial.reviewFeedback}</div>
+        </div>
+      )}
+
+      {showErrorBanner && Object.keys(errors).filter(k => errors[k]).length > 0 && (
+        <div className="mb-6 p-5 rounded-lg" style={{ background: "rgba(180,40,40,0.08)", borderLeft: "3px solid var(--red, #B42828)" }}>
+          <div className="flex items-center gap-2 mb-2 font-mono text-[11px] tracking-[0.15em] uppercase font-semibold" style={{ color: "var(--red, #B42828)" }}>
+            <AlertCircle size={13}/> Please complete {Object.keys(errors).filter(k => errors[k]).length} required field{Object.keys(errors).filter(k => errors[k]).length === 1 ? "" : "s"} before submitting
+          </div>
+          <div className="text-sm" style={{ color: "var(--ink)" }}>
+            Look for the red labels next to each field below. The form is not yet complete.
+          </div>
         </div>
       )}
 
