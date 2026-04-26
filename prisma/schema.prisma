@@ -24,6 +24,11 @@ model Hei {
   nameKhmer    String?
   shortCode    String   @unique
   type         HeiType
+  // Supervising ministry code — most HEIs report to MoEYS, but some are
+  // under MAFF (agriculture), MoH (health), MCFA (fine arts), MoLVT
+  // (vocational), etc. The full list of valid codes lives in the prototype's
+  // SUPERVISING_MINISTRIES; expand to a Ministry table if it ever grows.
+  ministry     String   @default("MoEYS")
   city         String?
   contactEmail String?
   isActive     Boolean  @default(true)

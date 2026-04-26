@@ -79,12 +79,13 @@ function dbHeiToPrototype(h: {
   name: string;
   nameKhmer: string | null;
   type: "PUBLIC" | "PRIVATE" | "INTERNATIONAL";
+  ministry: string;
 }) {
   return {
     code: h.shortCode,
     name: h.name,
     nameKh: h.nameKhmer ?? "",
-    ministry: "MoEYS",
+    ministry: h.ministry,
     type: h.type === "PUBLIC" ? "Public" : h.type === "PRIVATE" ? "Private" : "International",
   };
 }

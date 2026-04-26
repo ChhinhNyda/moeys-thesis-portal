@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "HEI" ADD COLUMN     "ministry" TEXT NOT NULL DEFAULT 'MoEYS';
