@@ -50,11 +50,33 @@ export async function POST(req: Request) {
 
   const { first, last } = splitName(String(body.author || ""));
 
-  const accessLevel = body.accessLevel === "embargoed" ? "embargoed" : "open";
-  const visibility = accessLevel === "embargoed" ? "METADATA_ONLY" : "PUBLIC";
-  const releasePolicy = accessLevel === "embargoed" ? "DELAY_1Y" : "IMMEDIATE";
-  const embargoUntil = body.embargoUntil ? new Date(String(body.embargoUntil)) : null;
-  const publicReleaseAt = accessLevel === "open" ? new Date() : embargoUntil;
+  const VALID_LICENSES = ["ALL_RIGHTS_RESERVED", "CC_BY", "CC_BY_NC", "CC_BY_NC_ND"] as const;
+  const VALID_POLICIES = ["IMMEDIATE", "DELAY_6M", "DELAY_1Y", "DELAY_2Y", "DELAY_3Y", "DELAY_5Y"] as const;
+  const VALID_REASONS = ["PATENT", "PUBLICATION", "COMMERCIAL", "SENSITIVE", "OTHER"] as const;
+
+  const license = VALID_LICENSES.includes(body.license as typeof VALID_LICENSES[number])
+    ? (body.license as typeof VALID_LICENSES[number])
+    : "CC_BY";
+  const releasePolicy = VALID_POLICIES.includes(body.releasePolicy as typeof VALID_POLICIES[number])
+    ? (body.releasePolicy as typeof VALID_POLICIES[number])
+    : "IMMEDIATE";
+  const releaseReason =
+    releasePolicy !== "IMMEDIATE" &&
+    VALID_REASONS.includes(body.releaseReason as typeof VALID_REASONS[number])
+      ? (body.releaseReason as typeof VALID_REASONS[number])
+      : null;
+  const releaseJustification = body.releaseJustification ? String(body.releaseJustification).trim() : null;
+
+  // The full PDF goes public when releasePolicy elapses; metadata stays public from approval.
+  const monthsByPolicy: Record<string, number> = {
+    IMMEDIATE: 0, DELAY_6M: 6, DELAY_1Y: 12, DELAY_2Y: 24, DELAY_3Y: 36, DELAY_5Y: 60,
+  };
+  const publicReleaseAt = new Date();
+  publicReleaseAt.setMonth(publicReleaseAt.getMonth() + monthsByPolicy[releasePolicy]);
+
+  // Visibility starts as METADATA_ONLY for any delayed release; the daily job
+  // (Phase 2.5c) flips it to PUBLIC once publicReleaseAt passes.
+  const visibility = releasePolicy === "IMMEDIATE" ? "PUBLIC" : "METADATA_ONLY";
 
   const status = intent === "submit" ? "UNDER_REVIEW" : "DRAFT";
 
@@ -72,7 +94,7 @@ export async function POST(req: Request) {
       language: mapLanguage(body.language as string | undefined),
       authorFirstName: first,
       authorLastName: last,
-      authorEmail: body.authorEmail ? String(body.authorEmail) : null,
+      authorEmail: body.authorEmail ? String(body.authorEmail).trim() : null,
       degreeLevel: mapDegree(body.degree as string | undefined),
       fieldOfStudy: String(body.faculty || "").trim(),
       defenseYear,
@@ -81,8 +103,10 @@ export async function POST(req: Request) {
       heiId: hei.id,
       status,
       releasePolicy,
+      releaseReason,
+      releaseJustification,
       publicReleaseAt,
-      license: "CC_BY",
+      license,
       visibility,
     },
     select: { id: true, status: true },

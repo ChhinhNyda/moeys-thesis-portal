@@ -313,7 +313,7 @@ export default function AppClient({ initialTheses, initialHeis }) {
     titleEn: data.titleEn,
     titleKh: data.titleKh,
     author: data.author,
-    authorEmail: data.submittedBy || undefined,
+    authorEmail: data.authorEmail || undefined,
     hei: data.hei,
     faculty: data.faculty,
     degree: data.degree,
@@ -322,8 +322,10 @@ export default function AppClient({ initialTheses, initialHeis }) {
     language: data.language,
     abstract: data.abstract,
     keywords: data.keywords,
-    accessLevel: data.accessLevel,
-    embargoUntil: data.embargoUntil,
+    license: data.license,
+    releasePolicy: data.releasePolicy,
+    releaseReason: data.releaseReason || undefined,
+    releaseJustification: data.releaseJustification || undefined,
   });
 
   const submitThesis = async (data) => {
@@ -430,7 +432,9 @@ export default function AppClient({ initialTheses, initialHeis }) {
 
   const reviewDecision = async (id, decision, feedback, checklistState) => {
     const now = new Date().toISOString().slice(0,10);
-    const reviewer = "Dr. Vanna Chea (DRI)";
+    // Until Phase 3 auth is wired, the reviewer is unknown to the system.
+    // Generic placeholder; replace with the logged-in user's name once auth lands.
+    const reviewer = "MoEYS Reviewer";
     const t = theses.find(x => x.id === id);
     if (!t) return;
 
@@ -1346,6 +1350,7 @@ function SubmissionConfirmation({ title, onViewSubmissions, onBrowse }) {
 const FIELD_LABELS: Record<string, string> = {
   titleEn: "Title (English)",
   author: "Author (romanized)",
+  authorEmail: "Author email",
   hei: "Institution",
   year: "Year",
   faculty: "Faculty / Department",
@@ -1353,17 +1358,24 @@ const FIELD_LABELS: Record<string, string> = {
   abstract: "Abstract",
   keywords: "Keywords (minimum 3)",
   similarityScore: "Similarity Score",
-  embargoUntil: "Embargo end date",
+  license: "License",
+  releasePolicy: "Release timing",
+  releaseReason: "Reason for delayed release",
+  releaseJustification: "Justification",
   thesisMaster: "Thesis — Master Copy (PDF)",
   similarityReport: "Plagiarism Similarity Report (PDF)",
 };
 
 function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, initial, submitting }) {
   const [form, setForm] = useState(initial || {
-    titleEn: "", titleKh: "", author: "", authorKh: "",
+    titleEn: "", titleKh: "", author: "", authorKh: "", authorEmail: "",
     hei: heiContext, faculty: "", degree: "Master", year: new Date().getFullYear(),
     supervisor: "", abstract: "", keywords: [], language: "English", callNumber: "",
-    similarityScore: "", accessLevel: "open", embargoUntil: "",
+    similarityScore: "",
+    license: "CC_BY",
+    releasePolicy: "IMMEDIATE",
+    releaseReason: "",
+    releaseJustification: "",
     files: { thesisMaster: null, thesisPublic: null, similarityReport: null },
   });
   const [keywordInput, setKeywordInput] = useState("");
@@ -1384,6 +1396,8 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
     const e = {};
     if (!form.titleEn.trim()) e.titleEn = "Required";
     if (!form.author.trim()) e.author = "Required";
+    if (!form.authorEmail.trim()) e.authorEmail = "Required for submission";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.authorEmail.trim())) e.authorEmail = "Enter a valid email address";
     if (!form.hei) e.hei = "Required";
     if (!form.year) e.year = "Required";
     if (!form.faculty.trim()) e.faculty = "Required for submission";
@@ -1391,7 +1405,10 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
     if (!form.abstract.trim()) e.abstract = "Required for submission";
     if (form.keywords.length < 3) e.keywords = "At least 3 keywords required";
     if (form.similarityScore === "" || form.similarityScore == null) e.similarityScore = "Similarity score required";
-    if (form.accessLevel === "embargoed" && !form.embargoUntil) e.embargoUntil = "Embargo end date required";
+    if (!form.license) e.license = "License choice required";
+    if (!form.releasePolicy) e.releasePolicy = "Release timing required";
+    if (form.releasePolicy && form.releasePolicy !== "IMMEDIATE" && !form.releaseReason) e.releaseReason = "Reason required when delaying public release";
+    if (form.releaseReason === "OTHER" && !form.releaseJustification.trim()) e.releaseJustification = "Brief justification required when reason is 'Other'";
     if (!form.files?.thesisMaster) e.thesisMaster = "Thesis PDF required";
     if (!form.files?.similarityReport) e.similarityReport = "Similarity report required";
     setErrors(e); return Object.keys(e).length === 0;
@@ -1451,6 +1468,9 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
             <FormRow label="Author * (romanized)" error={errors.author}><input className="field" value={form.author} onChange={e => setField("author", e.target.value)} placeholder="e.g., Sok Dara"/></FormRow>
             <FormRow label="Author (Khmer)"><input className="field font-khmer" value={form.authorKh} onChange={e => setField("authorKh", e.target.value)} placeholder="សុខ ដារ៉ា"/></FormRow>
           </div>
+          <FormRow label="Author email *" error={errors.authorEmail} hint="Used to notify the author of approval, rejection, or revision requests.">
+            <input type="email" className="field" value={form.authorEmail} onChange={e => setField("authorEmail", e.target.value)} placeholder="e.g., sok.dara@rupp.edu.kh"/>
+          </FormRow>
         </FormSection>
 
         <FormSection title="Academic">
@@ -1548,24 +1568,56 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
           />
         </FormSection>
 
-        <FormSection title="Quality & Access">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <FormRow label="Similarity Score (%) * — from iThenticate, Turnitin, or equivalent" error={errors.similarityScore}>
-              <input type="number" min="0" max="100" className="field" value={form.similarityScore} onChange={e => setField("similarityScore", e.target.value === "" ? "" : parseInt(e.target.value))} placeholder="e.g., 12"/>
-            </FormRow>
-            <FormRow label="Access Level">
-              <select className="field" value={form.accessLevel} onChange={e => setField("accessLevel", e.target.value)}>
-                <option value="open">Open access (recommended)</option>
-                <option value="embargoed">Embargoed (delayed public release)</option>
-              </select>
-            </FormRow>
-          </div>
-          {form.accessLevel === "embargoed" && (
-            <FormRow label="Embargo end date *" error={errors.embargoUntil}><input type="date" className="field" value={form.embargoUntil} onChange={e => setField("embargoUntil", e.target.value)}/></FormRow>
+        <FormSection title="Quality">
+          <FormRow label="Similarity Score (%) * — from iThenticate, Turnitin, or equivalent" error={errors.similarityScore}>
+            <input type="number" min="0" max="100" className="field" value={form.similarityScore} onChange={e => setField("similarityScore", e.target.value === "" ? "" : parseInt(e.target.value))} placeholder="e.g., 12"/>
+          </FormRow>
+        </FormSection>
+
+        <FormSection title="Author rights & release">
+          <FormRow label="License *" error={errors.license} hint="The author chooses how their work may be reused. CC BY is the most open and most-cited.">
+            <select className="field" value={form.license} onChange={e => setField("license", e.target.value)}>
+              <option value="CC_BY">CC BY — attribution only (most open)</option>
+              <option value="CC_BY_NC">CC BY-NC — non-commercial use only</option>
+              <option value="CC_BY_NC_ND">CC BY-NC-ND — non-commercial, no derivatives</option>
+              <option value="ALL_RIGHTS_RESERVED">All rights reserved (most restrictive)</option>
+            </select>
+          </FormRow>
+
+          <FormRow label="Release timing *" error={errors.releasePolicy} hint="When the full PDF becomes publicly available. Metadata (title, abstract, keywords) is always public from approval.">
+            <select className="field" value={form.releasePolicy} onChange={e => setField("releasePolicy", e.target.value === "IMMEDIATE" ? e.target.value : e.target.value)}>
+              <option value="IMMEDIATE">Immediate — release on approval (recommended)</option>
+              <option value="DELAY_6M">Delay 6 months</option>
+              <option value="DELAY_1Y">Delay 1 year</option>
+              <option value="DELAY_2Y">Delay 2 years</option>
+              <option value="DELAY_3Y">Delay 3 years</option>
+              <option value="DELAY_5Y">Delay 5 years (maximum)</option>
+            </select>
+          </FormRow>
+
+          {form.releasePolicy && form.releasePolicy !== "IMMEDIATE" && (
+            <>
+              <FormRow label="Reason for delay *" error={errors.releaseReason}>
+                <select className="field" value={form.releaseReason} onChange={e => setField("releaseReason", e.target.value)}>
+                  <option value="">Select…</option>
+                  <option value="PATENT">Pending patent application</option>
+                  <option value="PUBLICATION">Pending journal publication</option>
+                  <option value="COMMERCIAL">Commercial sensitivity</option>
+                  <option value="SENSITIVE">Sensitive content (ethics, personal data)</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </FormRow>
+              {form.releaseReason === "OTHER" && (
+                <FormRow label="Justification *" error={errors.releaseJustification} hint="Briefly describe why public release is being delayed.">
+                  <textarea className="field" rows={3} value={form.releaseJustification} onChange={e => setField("releaseJustification", e.target.value)} placeholder="e.g., Thesis contains unpublished interview transcripts subject to participant consent agreements."/>
+                </FormRow>
+              )}
+            </>
           )}
+
           <div className="p-4 rounded-md text-xs" style={{ background: "var(--bg)", color: "var(--ink-soft)", borderLeft: "2px solid var(--line-strong)" }}>
             <div className="flex items-center gap-2 mb-1 font-semibold"><AlertCircle size={12}/> Submission declaration</div>
-            <div>By submitting, the HEI confirms that the thesis has passed institutional examination, copyright clearance has been obtained for all third-party material, and the author has consented to dissemination under the stated access level.</div>
+            <div>By submitting, the HEI confirms that the thesis has passed institutional examination, copyright clearance has been obtained for all third-party material, and the author has consented to dissemination under the stated license and release timing.</div>
           </div>
         </FormSection>
 
@@ -1741,11 +1793,12 @@ function FormSection({ title, children }) {
   );
 }
 
-function FormRow({ label, error, children }) {
+function FormRow({ label, error, hint, children }) {
   return (
     <div>
       <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--ink-soft)" }}>{label}{error && <span className="ml-2 font-normal" style={{ color: "var(--red)" }}>— {error}</span>}</label>
       {children}
+      {hint && !error && <div className="text-[11px] mt-1" style={{ color: "var(--ink-faint)" }}>{hint}</div>}
     </div>
   );
 }
