@@ -326,6 +326,8 @@ export default function AppClient({ initialTheses, initialHeis }) {
     releasePolicy: data.releasePolicy,
     releaseReason: data.releaseReason || undefined,
     releaseJustification: data.releaseJustification || undefined,
+    licenseAcknowledged: !!data.licenseAcknowledged,
+    authorshipConfirmed: !!data.authorshipConfirmed,
   });
 
   const submitThesis = async (data) => {
@@ -1366,6 +1368,8 @@ const FIELD_LABELS: Record<string, string> = {
   releaseJustification: "Justification",
   thesisMaster: "Thesis — Master Copy (PDF)",
   similarityReport: "Plagiarism Similarity Report (PDF)",
+  licenseAcknowledged: "License acknowledgement",
+  authorshipConfirmed: "Authorship & copyright confirmation",
 };
 
 function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, initial, submitting }) {
@@ -1378,6 +1382,8 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
     releasePolicy: "IMMEDIATE",
     releaseReason: "",
     releaseJustification: "",
+    licenseAcknowledged: false,
+    authorshipConfirmed: false,
     files: { thesisMaster: null, thesisPublic: null, similarityReport: null },
   });
   const [keywordInput, setKeywordInput] = useState("");
@@ -1413,6 +1419,8 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
     if (form.releaseReason === "OTHER" && !form.releaseJustification.trim()) e.releaseJustification = "Brief justification required when reason is 'Other'";
     if (!form.files?.thesisMaster) e.thesisMaster = "Thesis PDF required";
     if (!form.files?.similarityReport) e.similarityReport = "Similarity report required";
+    if (!form.licenseAcknowledged) e.licenseAcknowledged = "Author must acknowledge the license terms";
+    if (!form.authorshipConfirmed) e.authorshipConfirmed = "Authorship and copyright clearance must be confirmed";
     setErrors(e); return Object.keys(e).length === 0;
   };
 
@@ -1617,9 +1625,42 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
             </>
           )}
 
-          <div className="p-4 rounded-md text-xs" style={{ background: "var(--bg)", color: "var(--ink-soft)", borderLeft: "2px solid var(--line-strong)" }}>
-            <div className="flex items-center gap-2 mb-1 font-semibold"><AlertCircle size={12}/> Submission declaration</div>
-            <div>By submitting, the HEI confirms that the thesis has passed institutional examination, copyright clearance has been obtained for all third-party material, and the author has consented to dissemination under the stated license and release timing.</div>
+          <div className="p-5 rounded-md text-sm space-y-3" style={{ background: "var(--bg)", borderLeft: "2px solid var(--line-strong)" }}>
+            <div className="flex items-center gap-2 font-semibold text-xs uppercase tracking-wider" style={{ color: "var(--ink-faint)" }}>
+              <AlertCircle size={12}/> Submission declarations
+            </div>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.licenseAcknowledged}
+                onChange={e => setField("licenseAcknowledged", e.target.checked)}
+                className="mt-0.5 flex-shrink-0"
+                style={{ width: 16, height: 16, accentColor: "var(--accent)" }}
+              />
+              <div>
+                <div style={{ color: "var(--ink)" }}>
+                  The author has reviewed and agreed to the chosen license and release timing.
+                </div>
+                {errors.licenseAcknowledged && <div className="text-xs mt-1" style={{ color: "var(--red)" }}>{errors.licenseAcknowledged}</div>}
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.authorshipConfirmed}
+                onChange={e => setField("authorshipConfirmed", e.target.checked)}
+                className="mt-0.5 flex-shrink-0"
+                style={{ width: 16, height: 16, accentColor: "var(--accent)" }}
+              />
+              <div>
+                <div style={{ color: "var(--ink)" }}>
+                  The HEI confirms the thesis has passed institutional examination and that copyright clearance has been obtained for all third-party material (figures, quotes, datasets).
+                </div>
+                {errors.authorshipConfirmed && <div className="text-xs mt-1" style={{ color: "var(--red)" }}>{errors.authorshipConfirmed}</div>}
+              </div>
+            </label>
           </div>
         </FormSection>
 

@@ -107,6 +107,8 @@ export async function POST(req: Request) {
       releaseJustification,
       publicReleaseAt,
       license,
+      licenseAcknowledged: body.licenseAcknowledged === true,
+      authorshipConfirmed: body.authorshipConfirmed === true,
       visibility,
     },
     select: { id: true, status: true },
