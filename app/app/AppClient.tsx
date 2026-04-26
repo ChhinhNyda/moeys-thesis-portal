@@ -1976,10 +1976,34 @@ function ReviewPanel({ thesis, hei, onDecision, onClose }) {
   );
   const [feedback, setFeedback] = useState("");
   const [mode, setMode] = useState(null); // null | approve | revision | reject
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState(null);
 
   const toggle = (id) => setChecklist({ ...checklist, [id]: !checklist[id] });
   const allChecked = QC_CHECKLIST.every(c => checklist[c.id]);
   const checkedCount = QC_CHECKLIST.filter(c => checklist[c.id]).length;
+
+  async function handleDownload() {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const res = await fetch("/api/download-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thesisId: thesis.id, mode: "review" }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Download failed (${res.status})`);
+      }
+      const { url } = await res.json();
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      setDownloadError(e.message);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   const submit = () => {
     if (!mode) return;
@@ -2040,12 +2064,31 @@ function ReviewPanel({ thesis, hei, onDecision, onClose }) {
           </div>
 
           <div className="mb-6">
-            <SectionLabel>Attached files</SectionLabel>
-            <div className="space-y-2 mt-2">
-              <AttachedFile label="Thesis — Master Copy" meta={thesis.files?.thesisMaster} tone="accent"/>
-              {thesis.files?.thesisPublic && <AttachedFile label="Thesis — Public Version" meta={thesis.files.thesisPublic}/>}
-              <AttachedFile label="Plagiarism Similarity Report" meta={thesis.files?.similarityReport}/>
-            </div>
+            <SectionLabel>Thesis PDF</SectionLabel>
+            {thesis.pdfFileKey ? (
+              <div className="mt-2">
+                <button onClick={handleDownload} disabled={downloading} className="btn btn-primary">
+                  <Download size={14}/> {downloading ? "Preparing…" : "Download thesis PDF"}
+                </button>
+                {downloadError && (
+                  <div className="mt-2 text-sm" style={{ color: "var(--red)" }}>
+                    <AlertCircle size={14} className="inline mr-1"/> {downloadError}
+                  </div>
+                )}
+              </div>
+            ) : (thesis.files?.thesisMaster || thesis.files?.similarityReport) ? (
+              // Legacy in-session uploads (sample data only) — kept so the
+              // demo prototype still works for the seed theses
+              <div className="space-y-2 mt-2">
+                <AttachedFile label="Thesis — Master Copy" meta={thesis.files?.thesisMaster} tone="accent"/>
+                {thesis.files?.thesisPublic && <AttachedFile label="Thesis — Public Version" meta={thesis.files.thesisPublic}/>}
+                <AttachedFile label="Plagiarism Similarity Report" meta={thesis.files?.similarityReport}/>
+              </div>
+            ) : (
+              <div className="mt-2 text-sm" style={{ color: "var(--ink-faint)" }}>
+                No PDF available for this thesis.
+              </div>
+            )}
           </div>
 
           <div className="mb-6">
