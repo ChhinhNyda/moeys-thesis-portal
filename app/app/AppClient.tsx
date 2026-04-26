@@ -1320,6 +1320,24 @@ function SubmissionConfirmation({ title, onViewSubmissions, onBrowse }) {
   );
 }
 
+// Friendly names for each form-validation error key, used by the
+// "missing fields" summary banner so users see the actual field name
+// instead of an internal key.
+const FIELD_LABELS: Record<string, string> = {
+  titleEn: "Title (English)",
+  author: "Author (romanized)",
+  hei: "Institution",
+  year: "Year",
+  faculty: "Faculty / Department",
+  supervisor: "Supervisor",
+  abstract: "Abstract",
+  keywords: "Keywords (minimum 3)",
+  similarityScore: "Similarity Score",
+  embargoUntil: "Embargo end date",
+  thesisMaster: "Thesis — Master Copy (PDF)",
+  similarityReport: "Plagiarism Similarity Report (PDF)",
+};
+
 function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, initial }) {
   const [form, setForm] = useState(initial || {
     titleEn: "", titleKh: "", author: "", authorKh: "",
@@ -1332,7 +1350,15 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
   const [errors, setErrors] = useState({});
 
   const setField = (k, v) => { setForm({ ...form, [k]: v }); if (errors[k]) setErrors({ ...errors, [k]: null }); };
-  const addKeyword = () => { const k = keywordInput.trim(); if (k && !form.keywords.includes(k)) setForm({ ...form, keywords: [...form.keywords, k] }); setKeywordInput(""); };
+  const addKeyword = () => {
+    const k = keywordInput.trim().replace(/,+$/, "");
+    if (k && !form.keywords.includes(k)) {
+      const next = [...form.keywords, k];
+      setForm({ ...form, keywords: next });
+      if (errors.keywords) setErrors({ ...errors, keywords: null });
+    }
+    setKeywordInput("");
+  };
 
   const validateFull = () => {
     const e = {};
@@ -1389,9 +1415,11 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
           <div className="flex items-center gap-2 mb-2 font-mono text-[11px] tracking-[0.15em] uppercase font-semibold" style={{ color: "var(--red, #B42828)" }}>
             <AlertCircle size={13}/> Please complete {Object.keys(errors).filter(k => errors[k]).length} required field{Object.keys(errors).filter(k => errors[k]).length === 1 ? "" : "s"} before submitting
           </div>
-          <div className="text-sm" style={{ color: "var(--ink)" }}>
-            Look for the red labels next to each field below. The form is not yet complete.
-          </div>
+          <ul className="text-sm mt-2 ml-1 space-y-1" style={{ color: "var(--ink)" }}>
+            {Object.keys(errors).filter(k => errors[k]).map(k => (
+              <li key={k}>• <strong>{FIELD_LABELS[k] || k}</strong>{errors[k] && errors[k] !== "Required" && errors[k] !== "Required for submission" ? ` — ${errors[k]}` : ""}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -1435,11 +1463,29 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
 
         <FormSection title="Content">
           <FormRow label="Abstract *" error={errors.abstract}><textarea className="field" rows={6} value={form.abstract} onChange={e => setField("abstract", e.target.value)} placeholder="Paste or type the thesis abstract here…"/></FormRow>
-          <FormRow label="Keywords * (minimum 3)" error={errors.keywords}>
+          <FormRow label={`Keywords * (${form.keywords.length} of 3 minimum)`} error={errors.keywords}>
             <div>
               <div className="flex gap-2">
-                <input className="field" value={keywordInput} onChange={e => setKeywordInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addKeyword(); } }} placeholder="Type a keyword and press Enter"/>
-                <button type="button" onClick={addKeyword} className="btn btn-ghost">Add</button>
+                <input
+                  className="field"
+                  value={keywordInput}
+                  onChange={e => {
+                    const v = e.target.value;
+                    if (v.endsWith(",")) {
+                      setKeywordInput(v.slice(0, -1));
+                      addKeyword();
+                    } else {
+                      setKeywordInput(v);
+                    }
+                  }}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addKeyword(); } }}
+                  onBlur={() => { if (keywordInput.trim()) addKeyword(); }}
+                  placeholder="Type a keyword, then press Enter or comma to add"
+                />
+                <button type="button" onClick={addKeyword} className="btn btn-primary">Add keyword</button>
+              </div>
+              <div className="text-xs mt-2" style={{ color: "var(--ink-faint)" }}>
+                Press <kbd className="font-mono">Enter</kbd> or <kbd className="font-mono">,</kbd> after each keyword. Each one becomes a removable pill below.
               </div>
               {form.keywords.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-3">
