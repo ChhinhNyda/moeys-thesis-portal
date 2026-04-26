@@ -256,6 +256,7 @@ export default function AppClient({ initialTheses, initialHeis }) {
   const [editingId, setEditingId] = useState(null);
   const [reviewingId, setReviewingId] = useState(null);
   const [submittedTitle, setSubmittedTitle] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
@@ -326,6 +327,9 @@ export default function AppClient({ initialTheses, initialHeis }) {
   });
 
   const submitThesis = async (data) => {
+    if (submitting) return; // guard against double-click while in flight
+    setSubmitting(true);
+    let thesisId = null;
     try {
       // 1. Find the actual File object the user selected (held in session cache)
       const fileMeta = data.files?.thesisMaster;
@@ -345,7 +349,7 @@ export default function AppClient({ initialTheses, initialHeis }) {
         const err = await createRes.json().catch(() => ({}));
         throw new Error(err.error || `Create failed (${createRes.status})`);
       }
-      const { id: thesisId } = await createRes.json();
+      ({ id: thesisId } = await createRes.json());
 
       // 3. Ask the server for a presigned R2 upload URL
       const urlRes = await fetch("/api/upload-url", {
@@ -380,16 +384,29 @@ export default function AppClient({ initialTheses, initialHeis }) {
         throw new Error(err.error || `Confirm failed (${confirmRes.status})`);
       }
 
+      // Success — flow completed cleanly, don't delete the row in the catch
+      thesisId = null;
       showToast("Thesis submitted to MoEYS for review");
       setEditingId(null);
       setSubmittedTitle(data.titleEn);
       setView("hei_submitted");
     } catch (e) {
+      // Self-heal: if a row was created before the failure, drop it so the
+      // user doesn't end up with an orphan "submitted" thesis with no PDF
+      if (thesisId) {
+        try {
+          await fetch(`/api/theses/${thesisId}`, { method: "DELETE" });
+        } catch { /* best-effort cleanup; ignore */ }
+      }
       showToast(`Submission failed: ${e.message}`, "error");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const saveDraft = async (data) => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const createRes = await fetch("/api/theses", {
         method: "POST",
@@ -406,6 +423,8 @@ export default function AppClient({ initialTheses, initialHeis }) {
       setTimeout(() => window.location.reload(), 700);
     } catch (e) {
       showToast(`Save failed: ${e.message}`, "error");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -504,6 +523,7 @@ export default function AppClient({ initialTheses, initialHeis }) {
                 onSubmit={submitThesis}
                 onCancel={() => { setEditingId(null); setView("hei_dashboard"); }}
                 initial={editingThesis}
+                submitting={submitting}
               />
             )}
             {view === "hei_submitted" && role === "hei" && (
@@ -1338,7 +1358,7 @@ const FIELD_LABELS: Record<string, string> = {
   similarityReport: "Plagiarism Similarity Report (PDF)",
 };
 
-function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, initial }) {
+function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, initial, submitting }) {
   const [form, setForm] = useState(initial || {
     titleEn: "", titleKh: "", author: "", authorKh: "",
     hei: heiContext, faculty: "", degree: "Master", year: new Date().getFullYear(),
@@ -1550,10 +1570,12 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
         </FormSection>
 
         <div className="flex items-center justify-between gap-3 pt-4 border-t flex-wrap" style={{ borderColor: "var(--line)" }}>
-          <button onClick={onCancel} className="btn btn-ghost">Cancel</button>
+          <button onClick={onCancel} disabled={submitting} className="btn btn-ghost">Cancel</button>
           <div className="flex gap-2">
-            <button onClick={handleSaveDraft} className="btn btn-ghost"><FileText size={14}/> Save as draft</button>
-            <button onClick={handleSubmit} className="btn btn-primary"><Send size={14}/> Submit to MoEYS</button>
+            <button onClick={handleSaveDraft} disabled={submitting} className="btn btn-ghost"><FileText size={14}/> Save as draft</button>
+            <button onClick={handleSubmit} disabled={submitting} className="btn btn-primary">
+              {submitting ? <><Clock size={14}/> Uploading…</> : <><Send size={14}/> Submit to MoEYS</>}
+            </button>
           </div>
         </div>
       </div>
