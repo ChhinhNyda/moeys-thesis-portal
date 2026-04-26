@@ -1,6 +1,11 @@
 import { prisma } from "../../lib/prisma";
 import AppClient from "./AppClient";
 
+// Re-fetch theses on every request so newly submitted ones show up
+// immediately in the HEI dashboard / Review Queue (instead of waiting
+// for the next build). Cheap at pilot scale; revisit when traffic grows.
+export const dynamic = "force-dynamic";
+
 // Map DB Thesis (+ relation hei) into the shape the prototype's UI expects.
 // The prototype was built before the schema; this adapter bridges them.
 // When Phase 3 replaces the prototype, this file goes away.

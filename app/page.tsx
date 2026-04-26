@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { prisma } from "../lib/prisma";
 
+// Re-fetch the live counts on every request so the landing page reflects
+// the latest archive size as soon as a thesis is approved.
+export const dynamic = "force-dynamic";
+
 export default async function LandingPage() {
   const [thesesCount, heisCount] = await Promise.all([
     prisma.thesis.count({ where: { status: "APPROVED" } }),
