@@ -1051,7 +1051,11 @@ function ThesisCard({ thesis, hei, onClick, showStatus }) {
 // ======================================================================
 function DetailModal({ thesis, hei, ministry, role, onClose }) {
   const showWorkflow = role !== "public";
-  const canDownload = thesis.pdfFileKey && thesis.accessLevel === "open";
+  // Public users can only download once a thesis is approved AND open access.
+  // Anyone working inside the platform (HEI staff, reviewers, admins, minister)
+  // needs PDF access regardless of approval status — reviewers must read the
+  // thesis to review it, and HEIs must verify what they uploaded.
+  const canDownload = !!thesis.pdfFileKey && (role !== "public" || thesis.accessLevel === "open");
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
 
@@ -1062,7 +1066,12 @@ function DetailModal({ thesis, hei, ministry, role, onClose }) {
       const res = await fetch("/api/download-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ thesisId: thesis.id }),
+        body: JSON.stringify({
+          thesisId: thesis.id,
+          // Honor-system flag while there's no real auth; Phase 3 replaces this
+          // with a server-side role check on the session.
+          mode: role === "public" ? "public" : "review",
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
