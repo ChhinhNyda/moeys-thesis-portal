@@ -23,7 +23,7 @@ function dbThesisToPrototype(t: {
   fieldOfStudy: string;
   defenseYear: number;
   supervisorName: string;
-  status: "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "WITHDRAWN";
+  status: "DRAFT" | "UNDER_REVIEW" | "REVISION_REQUESTED" | "APPROVED" | "REJECTED" | "WITHDRAWN";
   visibility: "PUBLIC" | "METADATA_ONLY" | "HIDDEN";
   submittedAt: Date;
   approvedAt: Date | null;
@@ -36,7 +36,8 @@ function dbThesisToPrototype(t: {
   if (t.status === "APPROVED" && t.visibility === "PUBLIC") protoStatus = "published";
   else if (t.status === "APPROVED" && t.visibility === "METADATA_ONLY") protoStatus = "embargoed";
   else if (t.status === "UNDER_REVIEW") protoStatus = "submitted";
-  else if (t.status === "REJECTED") protoStatus = "revision_requested";
+  else if (t.status === "REVISION_REQUESTED") protoStatus = "revision_requested";
+  else if (t.status === "REJECTED") protoStatus = "rejected";
   else if (t.status === "DRAFT") protoStatus = "submitted";
   else protoStatus = "submitted";
 

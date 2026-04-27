@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "ThesisStatus" ADD VALUE 'REVISION_REQUESTED';

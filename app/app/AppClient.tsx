@@ -434,46 +434,49 @@ export default function AppClient({ initialTheses, initialHeis }) {
 
   const reviewDecision = async (id, decision, feedback, checklistState) => {
     const now = new Date().toISOString().slice(0,10);
-    // Until Phase 3 auth is wired, the reviewer is unknown to the system.
-    // Generic placeholder; replace with the logged-in user's name once auth lands.
     const reviewer = "MoEYS Reviewer";
-    const t = theses.find(x => x.id === id);
-    if (!t) return;
 
-    let newStatus = t.status;
-    let historyEntry;
-
-    if (decision === "approve") {
-      newStatus = t.accessLevel === "embargoed" ? "embargoed" : "published";
-      historyEntry = { at: now, by: reviewer, action: "Approved — all QC items verified" + (feedback ? `: ${feedback}` : "") };
-    } else if (decision === "revision") {
-      newStatus = "revision_requested";
-      historyEntry = { at: now, by: reviewer, action: `Requested revision — ${feedback}` };
-    } else if (decision === "reject") {
-      newStatus = "rejected";
-      historyEntry = { at: now, by: reviewer, action: `Rejected — ${feedback}` };
-    } else if (decision === "claim") {
-      newStatus = "under_review";
-      historyEntry = { at: now, by: reviewer, action: "Claimed for review" };
+    // "claim" is UI-only — the schema has no claimed-by-reviewer state, and
+    // until Phase 3 auth there's no actual reviewer identity to attach.
+    // Just update local state and exit.
+    if (decision === "claim") {
+      const t = theses.find(x => x.id === id);
+      if (!t) return;
+      const updated = theses.map(x => x.id === id ? {
+        ...x,
+        status: "under_review",
+        reviewedBy: reviewer,
+        history: [...(x.history || []), { at: now, by: reviewer, action: "Claimed for review" }],
+      } : x);
+      setTheses(updated);
+      showToast("Thesis claimed for review");
+      return;
     }
 
-    const updated = theses.map(x => x.id === id ? {
-      ...x,
-      status: newStatus,
-      reviewedBy: reviewer,
-      approvedAt: decision === "approve" ? now : x.approvedAt,
-      publishedAt: (decision === "approve" && newStatus === "published") ? now : x.publishedAt,
-      reviewFeedback: decision === "revision" || decision === "reject" ? feedback : x.reviewFeedback,
-      qcChecklist: checklistState || x.qcChecklist,
-      history: [...(x.history || []), historyEntry],
-    } : x);
-
-    setTheses(updated);
-    await sSet(STORAGE_THESES, updated);
-
-    const msgMap = { approve: "Thesis approved and published", revision: "Revision requested — sent back to HEI", reject: "Thesis rejected", claim: "Thesis claimed for review" };
-    showToast(msgMap[decision] || "Decision recorded");
-    if (decision !== "claim") setReviewingId(null);
+    // approve / revision / reject — persist to DB so the decision survives
+    // a refresh (force-dynamic re-fetches state from Neon on every load).
+    try {
+      const res = await fetch(`/api/theses/${id}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, feedback }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Review failed (${res.status})`);
+      }
+      const msgMap = {
+        approve: "Thesis approved",
+        revision: "Revision requested — sent back to HEI",
+        reject: "Thesis rejected",
+      };
+      showToast(msgMap[decision] || "Decision recorded");
+      setReviewingId(null);
+      // Reload so SSR picks up the new status from the DB
+      setTimeout(() => window.location.reload(), 700);
+    } catch (e) {
+      showToast(`Decision failed: ${e.message}`, "error");
+    }
   };
 
   const deleteThesis = async (id) => {
