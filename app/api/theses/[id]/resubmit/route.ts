@@ -1,17 +1,24 @@
 // POST /api/theses/[id]/resubmit
-// Body: same shape as POST /api/theses (no `intent` — resubmit always means
-// "submit", not "draft").
+// Body: same shape as POST /api/theses, including `intent: "draft" | "submit"`.
 //
-// Updates an existing REVISION_REQUESTED thesis with the author's revised
-// metadata, clears the previous reviewer feedback, and flips status back
-// to UNDER_REVIEW so it re-enters the queue. PDF re-upload (if any) goes
-// through the standard upload-url + confirm-upload flow afterwards; the
-// key is the same (`theses/<id>.pdf`), so a new upload simply overwrites
-// the previous PDF in R2.
+// Updates an existing editable thesis (DRAFT or REVISION_REQUESTED) with
+// the latest metadata. Status transition depends on the current state +
+// intent:
 //
-// Refuses unless the thesis is currently in REVISION_REQUESTED state —
-// admins shouldn't be able to silently rewrite an APPROVED row through
-// this path.
+//   DRAFT              + intent=draft   → stays DRAFT
+//   DRAFT              + intent=submit  → UNDER_REVIEW (HEI ships the draft)
+//   REVISION_REQUESTED + intent=submit  → UNDER_REVIEW (resubmit after fix)
+//   REVISION_REQUESTED + intent=draft   → 400 (can't downgrade after MoEYS
+//                                              has issued revision feedback)
+//
+// rejectionReason is cleared whenever the thesis exits REVISION_REQUESTED.
+// PDF re-upload, if any, goes through the standard upload-url +
+// confirm-upload flow afterwards; the key is `theses/<id>.pdf`, so a new
+// upload overwrites the previous PDF in R2.
+//
+// Refuses unless the thesis is currently DRAFT or REVISION_REQUESTED —
+// the API never lets a caller silently rewrite an APPROVED, REJECTED, or
+// already-UNDER_REVIEW row through this path.
 
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
@@ -55,11 +62,27 @@ export async function POST(
   if (!existing) {
     return NextResponse.json({ error: "Thesis not found" }, { status: 404 });
   }
-  if (existing.status !== "REVISION_REQUESTED") {
+  if (existing.status !== "DRAFT" && existing.status !== "REVISION_REQUESTED") {
     return NextResponse.json(
-      { error: "Only theses awaiting revision can be resubmitted" },
+      { error: "This thesis is not in an editable state" },
       { status: 400 }
     );
+  }
+
+  const intent = body.intent === "submit" ? "submit" : "draft";
+
+  // Decide the new status based on current state + intent.
+  let newStatus: "DRAFT" | "UNDER_REVIEW";
+  if (intent === "submit") {
+    newStatus = "UNDER_REVIEW";
+  } else {
+    if (existing.status === "REVISION_REQUESTED") {
+      return NextResponse.json(
+        { error: "A thesis sent back for revision must be resubmitted, not saved as a draft" },
+        { status: 400 }
+      );
+    }
+    newStatus = "DRAFT";
   }
 
   const titleEn = String(body.titleEn || "").trim();
@@ -116,7 +139,7 @@ export async function POST(
       defenseYear,
       supervisorName: String(body.supervisor || "").trim(),
       heiId: hei.id,
-      status: "UNDER_REVIEW",
+      status: newStatus,
       releasePolicy,
       releaseReason,
       releaseJustification,

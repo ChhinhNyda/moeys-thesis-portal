@@ -334,10 +334,12 @@ export default function AppClient({ initialTheses, initialHeis }) {
     if (submitting) return; // guard against double-click while in flight
     setSubmitting(true);
 
-    // Resubmission of a revision-requested thesis vs. a brand-new submission.
-    // The form's `initial` prop is set to the existing thesis when the HEI
-    // hits "Revise & resubmit" — so data.id is the existing DB row's cuid.
-    const isResubmission = !!data.id && data.status === "revision_requested";
+    // Resubmission (REVISION_REQUESTED) or draft promotion (DRAFT) — both
+    // route to the same /resubmit endpoint, which also handles the
+    // "DRAFT → UNDER_REVIEW" transition. The form's `initial` prop sets
+    // data.id when an existing thesis is being edited.
+    const isResubmission =
+      !!data.id && (data.status === "revision_requested" || data.status === "draft");
     let thesisId = isResubmission ? data.id : null;
 
     try {
@@ -422,7 +424,14 @@ export default function AppClient({ initialTheses, initialHeis }) {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const createRes = await fetch("/api/theses", {
+      // If we're editing an existing draft, update it in place. Otherwise
+      // create a new draft row. Without this, "Continue → Save as draft"
+      // would orphan the original draft and create a duplicate.
+      const isExistingDraft = !!data.id && data.status === "draft";
+      const endpoint = isExistingDraft
+        ? `/api/theses/${data.id}/resubmit`
+        : "/api/theses";
+      const createRes = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildThesisPayload(data, "draft")),

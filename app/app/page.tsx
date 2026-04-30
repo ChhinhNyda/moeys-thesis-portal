@@ -42,7 +42,7 @@ function dbThesisToPrototype(t: {
   else if (t.status === "UNDER_REVIEW") protoStatus = "submitted";
   else if (t.status === "REVISION_REQUESTED") protoStatus = "revision_requested";
   else if (t.status === "REJECTED") protoStatus = "rejected";
-  else if (t.status === "DRAFT") protoStatus = "submitted";
+  else if (t.status === "DRAFT") protoStatus = "draft";
   else protoStatus = "submitted";
 
   const ymd = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : undefined);
