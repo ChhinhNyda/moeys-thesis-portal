@@ -1,6 +1,7 @@
 // @ts-nocheck
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
+import { signOut } from "next-auth/react";
 import { Search, Plus, Filter, X, Edit2, Trash2, BookOpen, GraduationCap, Building2, Calendar, User, FileText, ChevronDown, ArrowUpDown, Check, AlertCircle, Library, Shield, Clock, CheckCircle2, XCircle, RotateCcw, Send, Eye, Users, FileCheck, AlertTriangle, ClipboardList, MessageSquare, Lock, Upload, Paperclip, File as FileIcon, Download, Landmark, TrendingUp, Activity, Globe } from "lucide-react";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 
@@ -244,10 +245,14 @@ async function sSet(key, val) {
 // ======================================================================
 // MAIN APP
 // ======================================================================
-export default function AppClient({ initialTheses, initialHeis }) {
+export default function AppClient({ initialTheses, initialHeis, currentUser }) {
   const fallbackHei = initialHeis?.[0]?.code || "RUPP";
-  const [role, setRole] = useState("public"); // public | hei | reviewer | admin
-  const [heiContext, setHeiContext] = useState(fallbackHei);
+  // Role + heiContext come from the authenticated session (Slice 3a).
+  // Admins keep the role switcher so they can preview each role; everyone
+  // else is locked to their assigned role + HEI.
+  const isAdmin = currentUser?.role === "admin";
+  const [role, setRole] = useState(currentUser?.role || "public");
+  const [heiContext, setHeiContext] = useState(currentUser?.heiCode || fallbackHei);
   const [theses, setTheses] = useState(initialTheses || []);
   const [heis, setHeis] = useState(initialHeis?.length ? initialHeis : DEFAULT_HEIS);
   const [loading, setLoading] = useState(false);
@@ -260,14 +265,16 @@ export default function AppClient({ initialTheses, initialHeis }) {
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
-    // Theses and HEIs come from server props (DB) on every load.
-    // Only the role preference is restored from localStorage.
+    // Restore role/heiContext from localStorage only for admin previewing —
+    // everyone else gets the values that came in as a server prop and
+    // shouldn't be able to switch roles.
+    if (!isAdmin) return;
     (async () => {
-      const r = await sGet(STORAGE_ROLE, { role: "public", heiContext: fallbackHei });
+      const r = await sGet(STORAGE_ROLE, { role: currentUser?.role || "public", heiContext: currentUser?.heiCode || fallbackHei });
       if (r?.role) setRole(r.role);
       if (r?.heiContext) setHeiContext(r.heiContext);
     })();
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     // Default view changes per role
@@ -530,7 +537,7 @@ export default function AppClient({ initialTheses, initialHeis }) {
   return (
     <div className="min-h-screen w-full" style={{ background: "var(--bg)" }}>
       <StyleTag />
-      <RoleBanner role={role} heiContext={heiContext} heis={heis} onChangeRole={setRoleAndSave} />
+      <RoleBanner role={role} heiContext={heiContext} heis={heis} onChangeRole={setRoleAndSave} currentUser={currentUser} isAdmin={isAdmin} />
       <Header role={role} view={view} setView={setView} theses={theses} heiContext={heiContext}/>
 
       <main className="max-w-7xl mx-auto px-6 md:px-10 pb-24">
@@ -728,7 +735,7 @@ function StyleTag() {
 // ======================================================================
 // ROLE BANNER (demo switcher — in production this is tied to SSO)
 // ======================================================================
-function RoleBanner({ role, heiContext, heis, onChangeRole }) {
+function RoleBanner({ role, heiContext, heis, onChangeRole, currentUser, isAdmin }) {
   const roles = [
     { id: "public", label: "Public / Researcher", icon: BookOpen },
     { id: "hei", label: "HEI Submitter", icon: GraduationCap },
@@ -742,37 +749,63 @@ function RoleBanner({ role, heiContext, heis, onChangeRole }) {
       <div className="max-w-7xl mx-auto px-6 md:px-10 py-3">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2 text-xs" style={{ color: "var(--ink-faint)" }}>
-            <span className="font-mono tracking-[0.2em] uppercase" style={{ fontSize: "10px" }}>Viewing as</span>
+            <span className="font-mono tracking-[0.2em] uppercase" style={{ fontSize: "10px" }}>
+              {isAdmin ? "Viewing as" : "Signed in as"}
+            </span>
             <span className="font-mono tracking-[0.15em] uppercase font-semibold" style={{ color: "var(--accent)", fontSize: "10px" }}>
               {role === "hei" ? `${heiContext} Submitter` : roles.find(r => r.id === role)?.label}
             </span>
+            {currentUser && (
+              <span className="ml-2 text-xs" style={{ color: "var(--ink-faint)" }}>
+                · {currentUser.name}
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-1 flex-wrap">
-            {roles.map(r => {
-              const Icon = r.icon;
-              const active = role === r.id;
-              return (
-                <button key={r.id}
-                  onClick={() => onChangeRole(r.id, r.id === "hei" ? heiContext : undefined)}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md transition-all"
-                  style={{
-                    background: active ? "var(--accent)" : "transparent",
-                    color: active ? "var(--accent-ink)" : "var(--ink-soft)",
-                    border: `1px solid ${active ? "var(--accent)" : "var(--line-strong)"}`,
-                    fontWeight: active ? 600 : 400,
-                  }}>
-                  <Icon size={12}/>
-                  {r.label}
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Admins keep the role switcher to preview each role's view.
+                Other users only see their own role; switching is disabled. */}
+            {isAdmin && (
+              <div className="flex items-center gap-1 flex-wrap">
+                {roles.map(r => {
+                  const Icon = r.icon;
+                  const active = role === r.id;
+                  return (
+                    <button key={r.id}
+                      onClick={() => onChangeRole(r.id, r.id === "hei" ? heiContext : undefined)}
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md transition-all"
+                      style={{
+                        background: active ? "var(--accent)" : "transparent",
+                        color: active ? "var(--accent-ink)" : "var(--ink-soft)",
+                        border: `1px solid ${active ? "var(--accent)" : "var(--line-strong)"}`,
+                        fontWeight: active ? 600 : 400,
+                      }}>
+                      <Icon size={12}/>
+                      {r.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <button
+              onClick={() => signOut({ callbackUrl: "/" })}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md transition-all"
+              style={{
+                background: "transparent",
+                color: "var(--ink-soft)",
+                border: "1px solid var(--line-strong)",
+              }}
+              title="Sign out">
+              Sign out
+            </button>
           </div>
         </div>
 
-        {role === "hei" && (
+        {/* HEI selector only meaningful for admin previewing the HEI role.
+            Real HEI Coordinators are locked to their assigned institution. */}
+        {role === "hei" && isAdmin && (
           <div className="mt-3 pt-3 flex items-center gap-2 flex-wrap text-xs" style={{ borderTop: "1px dashed var(--line-strong)" }}>
             <span className="font-mono tracking-[0.15em] uppercase" style={{ color: "var(--ink-faint)", fontSize: "10px" }}>
-              Signed in on behalf of:
+              Previewing as HEI:
             </span>
             <select value={heiContext} onChange={e => onChangeRole("hei", e.target.value)}
               className="text-xs px-2 py-1 rounded-md font-mono font-semibold"
@@ -780,7 +813,7 @@ function RoleBanner({ role, heiContext, heis, onChangeRole }) {
               {heis.map(h => <option key={h.code} value={h.code}>{h.code} — {h.name}</option>)}
             </select>
             <span className="italic ml-1" style={{ color: "var(--ink-faint)", fontSize: "10px" }}>
-              Demo-only selector — in production, the institution is determined automatically by SSO.
+              Admin-only — real HEI Coordinators are locked to their own institution.
             </span>
           </div>
         )}

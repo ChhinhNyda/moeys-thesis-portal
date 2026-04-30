@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { prisma } from "../../lib/prisma";
+import { auth } from "../../lib/auth";
 import AppClient from "./AppClient";
 
 // Re-fetch theses on every request so newly submitted ones show up
@@ -103,8 +105,25 @@ function dbHeiToPrototype(h: {
   };
 }
 
+// Map DB role enum → the prototype's lowercase role string. Authors
+// don't appear here because they don't log in. Minister role isn't
+// implemented (skipped per the project plan); admin covers that view.
+function dbRoleToPrototype(role: "ADMIN" | "REVIEWER" | "HEI_COORDINATOR"): string {
+  if (role === "ADMIN") return "admin";
+  if (role === "REVIEWER") return "reviewer";
+  return "hei";
+}
+
 export default async function AppPage() {
-  const [dbTheses, dbHeis] = await Promise.all([
+  // Slice 3a: real auth gate. Anyone hitting /app without a session is
+  // sent to /sign-in. Once they sign in, the magic link's redirectTo
+  // brings them back here.
+  const session = await auth();
+  if (!session?.user) {
+    redirect("/sign-in");
+  }
+
+  const [dbTheses, dbHeis, currentUser] = await Promise.all([
     prisma.thesis.findMany({
       include: { hei: { select: { shortCode: true } } },
       orderBy: { submittedAt: "desc" },
@@ -113,10 +132,33 @@ export default async function AppPage() {
       where: { isActive: true },
       orderBy: { shortCode: "asc" },
     }),
+    // Re-fetch the user's own row so we get the canonical role + heiCode.
+    // session.user has these too but only at sign-in time; this catches
+    // mid-session role changes performed by an admin.
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: { hei: { select: { shortCode: true } } },
+    }),
   ]);
+
+  if (!currentUser || !currentUser.isActive) {
+    redirect("/sign-in?error=AccessDenied");
+  }
 
   const initialTheses = dbTheses.map(dbThesisToPrototype);
   const initialHeis = dbHeis.map(dbHeiToPrototype);
 
-  return <AppClient initialTheses={initialTheses} initialHeis={initialHeis} />;
+  return (
+    <AppClient
+      initialTheses={initialTheses}
+      initialHeis={initialHeis}
+      currentUser={{
+        id: currentUser.id,
+        name: currentUser.name ?? currentUser.email,
+        email: currentUser.email,
+        role: dbRoleToPrototype(currentUser.role),
+        heiCode: currentUser.hei?.shortCode ?? null,
+      }}
+    />
+  );
 }
