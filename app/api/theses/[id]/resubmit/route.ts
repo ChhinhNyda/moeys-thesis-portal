@@ -22,6 +22,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
+import { sendEmail } from "../../../../../lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -154,6 +155,17 @@ export async function POST(
     },
     select: { id: true, status: true },
   });
+
+  // Resubmission re-enters the queue → author gets the same submission
+  // notification so they're aware their revised version is now in review.
+  // Drafts (status stays DRAFT) don't trigger notification.
+  if (newStatus === "UNDER_REVIEW" && body.authorEmail && first) {
+    void sendEmail({
+      template: "submissionConfirmation",
+      to: String(body.authorEmail).trim(),
+      data: { authorName: `${first} ${last}`.trim(), thesisTitle: titleEn },
+    });
+  }
 
   return NextResponse.json({ id: updated.id, status: updated.status });
 }

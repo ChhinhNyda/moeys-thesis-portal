@@ -8,6 +8,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
+import { sendEmail } from "../../../lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +114,17 @@ export async function POST(req: Request) {
     },
     select: { id: true, status: true },
   });
+
+  // Notify the author when an HEI submits on their behalf — gives them a
+  // chance to object before review begins. Fire-and-forget; failure here
+  // must not block the API response. Drafts don't trigger notification.
+  if (intent === "submit" && body.authorEmail && first) {
+    void sendEmail({
+      template: "submissionConfirmation",
+      to: String(body.authorEmail).trim(),
+      data: { authorName: `${first} ${last}`.trim(), thesisTitle: titleEn },
+    });
+  }
 
   return NextResponse.json({ id: created.id, status: created.status });
 }

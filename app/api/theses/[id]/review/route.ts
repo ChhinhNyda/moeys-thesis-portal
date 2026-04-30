@@ -17,6 +17,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
+import { sendEmail } from "../../../../../lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,13 @@ export async function POST(
 
   const thesis = await prisma.thesis.findUnique({
     where: { id },
-    select: { id: true },
+    select: {
+      id: true,
+      title: true,
+      authorFirstName: true,
+      authorLastName: true,
+      authorEmail: true,
+    },
   });
   if (!thesis) {
     return NextResponse.json({ error: "Thesis not found" }, { status: 404 });
@@ -87,6 +94,31 @@ export async function POST(
     data: updates,
     select: { id: true, status: true },
   });
+
+  // Notify the author of the decision. Fire-and-forget — Resend failures
+  // shouldn't unwind the DB write that's already committed.
+  if (thesis.authorEmail) {
+    const authorName = `${thesis.authorFirstName} ${thesis.authorLastName}`.trim();
+    if (decision === "approve") {
+      void sendEmail({
+        template: "decisionApproved",
+        to: thesis.authorEmail,
+        data: { authorName, thesisTitle: thesis.title },
+      });
+    } else if (decision === "revision") {
+      void sendEmail({
+        template: "revisionRequested",
+        to: thesis.authorEmail,
+        data: { authorName, thesisTitle: thesis.title, feedback },
+      });
+    } else {
+      void sendEmail({
+        template: "decisionRejected",
+        to: thesis.authorEmail,
+        data: { authorName, thesisTitle: thesis.title, feedback },
+      });
+    }
+  }
 
   return NextResponse.json({ ok: true, decision, status: updated.status });
 }
