@@ -333,7 +333,13 @@ export default function AppClient({ initialTheses, initialHeis }) {
   const submitThesis = async (data) => {
     if (submitting) return; // guard against double-click while in flight
     setSubmitting(true);
-    let thesisId = null;
+
+    // Resubmission of a revision-requested thesis vs. a brand-new submission.
+    // The form's `initial` prop is set to the existing thesis when the HEI
+    // hits "Revise & resubmit" — so data.id is the existing DB row's cuid.
+    const isResubmission = !!data.id && data.status === "revision_requested";
+    let thesisId = isResubmission ? data.id : null;
+
     try {
       // 1. Find the actual File object the user selected (held in session cache)
       const fileMeta = data.files?.thesisMaster;
@@ -343,17 +349,19 @@ export default function AppClient({ initialTheses, initialHeis }) {
         return;
       }
 
-      // 2. Create the Thesis row in DB (status=UNDER_REVIEW)
-      const createRes = await fetch("/api/theses", {
+      // 2. Create or update the Thesis row in DB (status flips to UNDER_REVIEW)
+      const endpoint = isResubmission ? `/api/theses/${thesisId}/resubmit` : "/api/theses";
+      const createRes = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildThesisPayload(data, "submit")),
       });
       if (!createRes.ok) {
         const err = await createRes.json().catch(() => ({}));
-        throw new Error(err.error || `Create failed (${createRes.status})`);
+        throw new Error(err.error || `Submit failed (${createRes.status})`);
       }
-      ({ id: thesisId } = await createRes.json());
+      const created = await createRes.json();
+      thesisId = created.id;
 
       // 3. Ask the server for a presigned R2 upload URL
       const urlRes = await fetch("/api/upload-url", {
@@ -395,9 +403,11 @@ export default function AppClient({ initialTheses, initialHeis }) {
       setSubmittedTitle(data.titleEn);
       setView("hei_submitted");
     } catch (e) {
-      // Self-heal: if a row was created before the failure, drop it so the
-      // user doesn't end up with an orphan "submitted" thesis with no PDF
-      if (thesisId) {
+      // Self-heal: if a fresh row was created (not a resubmission of an
+      // existing one) before the failure, drop it so the user doesn't end
+      // up with an orphan "submitted" thesis with no PDF. Never delete on
+      // resubmission failure — the existing row pre-dates this attempt.
+      if (thesisId && !isResubmission) {
         try {
           await fetch(`/api/theses/${thesisId}`, { method: "DELETE" });
         } catch { /* best-effort cleanup; ignore */ }
