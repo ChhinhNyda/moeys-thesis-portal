@@ -36,8 +36,76 @@ model Hei {
   updatedAt    DateTime @updatedAt
 
   theses Thesis[]
+  users  User[]
 
   @@map("HEI")
+}
+
+// ─── Auth (Auth.js v5 with Prisma adapter + email magic link) ───────
+// User, Account, Session, VerificationToken are the Auth.js-required
+// shapes. We extend User with `role` and an optional `heiId` for HEI
+// Coordinators. Authors do not have accounts — they only receive
+// notification emails.
+
+enum UserRole {
+  ADMIN              // MoEYS Admin (super)
+  REVIEWER           // MoEYS Reviewer (DRI staff who decide)
+  HEI_COORDINATOR    // HEI library/research office staff who submit
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(HEI_COORDINATOR)
+  heiId         String?
+  hei           Hei?      @relation(fields: [heiId], references: [id])
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+}
+
+// Account is required by the Prisma adapter even when only using email
+// magic link — it's used to link external auth providers if added later.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 // ─── Thesis ─────────────────────────────────────────────────────────

@@ -173,6 +173,44 @@ type SendArgs =
   | { template: "decisionApproved"; to: string; data: ApprovalData }
   | { template: "decisionRejected"; to: string; data: RejectionData };
 
+// ─── Magic-link sign-in (Auth.js calls this) ───────────────────────────
+
+export async function sendMagicLinkEmail(args: { to: string; url: string }): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.warn(`[email] Skipping magic link to ${args.to}: RESEND_API_KEY missing`);
+    return;
+  }
+
+  const subject = "Sign in to the MoEYS National Thesis Archive";
+  const html = emailFrame(`
+    <p>You requested to sign in to the MoEYS National Thesis Archive.</p>
+    <p style="margin:24px 0;">
+      <a href="${args.url}" style="display:inline-block;padding:12px 28px;background:#0A2A6B;color:#FBF7EC;text-decoration:none;border-radius:4px;font-weight:600;">Sign in</a>
+    </p>
+    <p style="font-size:13px;color:#5A4A38;">This link expires in 24 hours and can only be used once. If you didn't request it, you can ignore this email.</p>
+  `);
+  const text = `Sign in to the MoEYS National Thesis Archive:
+
+${args.url}
+
+This link expires in 24 hours and can only be used once. If you didn't request it, ignore this email.`;
+
+  try {
+    await resend.emails.send({
+      from: `${FROM_NAME} <${FROM_ADDRESS}>`,
+      to: args.to,
+      subject,
+      html,
+      text,
+    });
+    console.log(`[email] Sent magic link to ${args.to}`);
+  } catch (e) {
+    console.error(`[email] Failed to send magic link to ${args.to}:`, e);
+    throw e; // sign-in flow needs to know if email failed
+  }
+}
+
 export async function sendEmail(args: SendArgs): Promise<void> {
   const resend = getResend();
   if (!resend) {
