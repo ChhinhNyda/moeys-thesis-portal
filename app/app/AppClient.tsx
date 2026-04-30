@@ -480,10 +480,19 @@ export default function AppClient({ initialTheses, initialHeis }) {
   };
 
   const deleteThesis = async (id) => {
-    if (!confirm("Delete this record permanently? This cannot be undone.")) return;
-    const updated = theses.filter(t => t.id !== id);
-    setTheses(updated); await sSet(STORAGE_THESES, updated);
-    showToast("Record deleted", "warn");
+    if (!confirm("Delete this record permanently? This will also remove the PDF from storage and cannot be undone.")) return;
+    try {
+      const res = await fetch(`/api/theses/${id}?mode=admin`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Delete failed (${res.status})`);
+      }
+      showToast("Record deleted", "warn");
+      // Reload so SSR re-fetches the catalogue without the deleted row
+      setTimeout(() => window.location.reload(), 700);
+    } catch (e) {
+      showToast(`Delete failed: ${e.message}`, "error");
+    }
   };
 
   const addHei = async (hei) => {
