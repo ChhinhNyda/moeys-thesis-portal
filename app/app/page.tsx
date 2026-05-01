@@ -94,18 +94,24 @@ function dbThesisToPrototype(t: {
 }
 
 function dbHeiToPrototype(h: {
+  id: string;
   shortCode: string;
   name: string;
   nameKhmer: string | null;
   type: "PUBLIC" | "PRIVATE" | "INTERNATIONAL";
   ministry: string;
+  city: string | null;
+  contactEmail: string | null;
 }) {
   return {
+    id: h.id,
     code: h.shortCode,
     name: h.name,
     nameKh: h.nameKhmer ?? "",
     ministry: h.ministry,
     type: h.type === "PUBLIC" ? "Public" : h.type === "PRIVATE" ? "Private" : "International",
+    city: h.city ?? "",
+    contactEmail: h.contactEmail ?? "",
   };
 }
 

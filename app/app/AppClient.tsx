@@ -597,7 +597,7 @@ export default function AppClient({ initialTheses, initialHeis, currentUser, ini
               />
             )}
             {view === "admin_heis" && role === "admin" && (
-              <AdminHeis heis={heis} onAdd={addHei}/>
+              <AdminHeis heis={heis} showToast={showToast}/>
             )}
             {view === "admin_users" && role === "admin" && (
               <AdminUsers heis={heis} showToast={showToast}/>
@@ -2360,17 +2360,34 @@ function AdminRecords({ theses, heis, onEdit, onDelete, onOpenDetail }) {
   );
 }
 
-function AdminHeis({ heis, onAdd }) {
+function AdminHeis({ heis, showToast }) {
+  const [users, setUsers] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
-  const [code, setCode] = useState(""); const [name, setName] = useState("");
-  const [nameKh, setNameKh] = useState(""); const [ministry, setMinistry] = useState("MoEYS");
-  const [type, setType] = useState("Public");
+  const [editing, setEditing] = useState(null);
 
-  const submit = async () => {
-    if (!code.trim() || !name.trim()) return;
-    const ok = await onAdd({ code: code.trim().toUpperCase(), name: name.trim(), nameKh: nameKh.trim(), ministry, type });
-    if (ok) { setShowAdd(false); setCode(""); setName(""); setNameKh(""); }
+  // Coordinators per HEI — fetched once on mount and again after any
+  // create/edit so the table reflects the current assignment state.
+  const refreshUsers = async () => {
+    try {
+      const res = await fetch("/api/users");
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data.users || []);
+      }
+    } catch { /* best-effort */ }
   };
+  useEffect(() => { refreshUsers(); }, []);
+
+  const coordinatorsByHeiId = useMemo(() => {
+    const map = {};
+    for (const u of users) {
+      if (u.role === "HEI_COORDINATOR" && u.hei?.id && u.isActive) {
+        if (!map[u.hei.id]) map[u.hei.id] = [];
+        map[u.hei.id].push(u);
+      }
+    }
+    return map;
+  }, [users]);
 
   return (
     <div className="mt-10">
@@ -2380,9 +2397,9 @@ function AdminHeis({ heis, onAdd }) {
           <h2 className="font-display text-3xl md:text-4xl" style={{ fontWeight: 400 }}>
             <span style={{ fontStyle: "italic", fontWeight: 300 }}>Higher Education</span> Institutions
           </h2>
-          <p className="mt-2 text-sm" style={{ color: "var(--ink-soft)" }}>{heis.length} institutions registered across {SUPERVISING_MINISTRIES.length} supervising ministries.</p>
+          <p className="mt-2 text-sm" style={{ color: "var(--ink-soft)" }}>{heis.length} institutions registered. Click Edit on any row to update its details, or add an HEI / abroad scholar below.</p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="btn btn-primary"><Plus size={14}/> Register institution</button>
+        <button onClick={() => setShowAdd(true)} className="btn btn-primary"><Plus size={14}/> Add HEI or Scholar</button>
       </div>
 
       <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--line)", background: "var(--bg-card)" }}>
@@ -2391,58 +2408,323 @@ function AdminHeis({ heis, onAdd }) {
             <tr className="font-mono text-[10px] tracking-[0.15em] uppercase" style={{ color: "var(--ink-faint)" }}>
               <th className="text-left px-4 py-3">Code</th>
               <th className="text-left px-4 py-3">Name</th>
-              <th className="text-left px-4 py-3">Khmer</th>
               <th className="text-left px-4 py-3">Ministry</th>
               <th className="text-left px-4 py-3">Type</th>
+              <th className="text-left px-4 py-3">Coordinators</th>
+              <th className="text-right px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
-            {heis.map(h => (
-              <tr key={h.code} className="border-t" style={{ borderColor: "var(--line)" }}>
-                <td className="px-4 py-3 font-mono text-sm font-semibold" style={{ color: "var(--accent)" }}>{h.code}</td>
-                <td className="px-4 py-3" style={{ color: "var(--ink)" }}>{h.name}</td>
-                <td className="px-4 py-3 font-khmer" style={{ color: "var(--ink-soft)" }}>{h.nameKh || "—"}</td>
-                <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--ink-soft)" }}>{h.ministry || "—"}</td>
-                <td className="px-4 py-3 text-xs">
-                  <span className="px-2 py-0.5 rounded" style={{ background: h.type === "Public" ? "rgba(61,107,74,0.1)" : "rgba(176,133,56,0.1)", color: h.type === "Public" ? "var(--green)" : "var(--gold)", fontWeight: 600 }}>{h.type || "—"}</span>
-                </td>
-              </tr>
-            ))}
+            {heis.map(h => {
+              const coords = coordinatorsByHeiId[h.id] || [];
+              return (
+                <tr key={h.code} className="border-t" style={{ borderColor: "var(--line)" }}>
+                  <td className="px-4 py-3 font-mono text-sm font-semibold align-top" style={{ color: "var(--accent)" }}>{h.code}</td>
+                  <td className="px-4 py-3 align-top" style={{ color: "var(--ink)" }}>
+                    <div>{h.name}</div>
+                    {h.nameKh && <div className="font-khmer text-xs mt-0.5" style={{ color: "var(--ink-soft)" }}>{h.nameKh}</div>}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs align-top" style={{ color: "var(--ink-soft)" }}>{h.ministry || "—"}</td>
+                  <td className="px-4 py-3 text-xs align-top">
+                    <span className="px-2 py-0.5 rounded" style={{ background: h.type === "Public" ? "rgba(61,107,74,0.1)" : h.type === "International" ? "rgba(10,42,107,0.10)" : "rgba(176,133,56,0.1)", color: h.type === "Public" ? "var(--green)" : h.type === "International" ? "var(--accent)" : "var(--gold)", fontWeight: 600 }}>{h.type || "—"}</span>
+                  </td>
+                  <td className="px-4 py-3 align-top" style={{ color: "var(--ink-soft)" }}>
+                    {coords.length === 0 ? (
+                      <span className="text-xs italic" style={{ color: "var(--ink-faint)" }}>None assigned</span>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {coords.map(c => (
+                          <div key={c.id} className="text-xs">
+                            {c.name && <span style={{ color: "var(--ink)" }}>{c.name}</span>}
+                            {c.name && <span style={{ color: "var(--ink-faint)" }}> · </span>}
+                            <span className="font-mono" style={{ color: "var(--ink-faint)" }}>{c.email}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right align-top">
+                    <button onClick={() => setEditing(h)} className="btn btn-ghost" style={{ padding: "5px 10px", fontSize: "12px" }}>
+                      <Edit2 size={12}/> Edit
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
       {showAdd && (
-        <div className="modal-backdrop" onClick={() => setShowAdd(false)}>
-          <div className="modal-panel" style={{ maxWidth: 540 }} onClick={e => e.stopPropagation()}>
-            <div className="p-8">
-              <h3 className="font-display text-2xl mb-1" style={{ fontWeight: 500 }}>Register institution</h3>
-              <p className="text-sm mb-6" style={{ color: "var(--ink-soft)" }}>Add a new higher education institution to the national repository.</p>
-              <div className="space-y-4">
-                <FormRow label="Code (short)"><input className="field font-mono uppercase" value={code} onChange={e => setCode(e.target.value.toUpperCase())} maxLength={10}/></FormRow>
-                <FormRow label="Full name"><input className="field" value={name} onChange={e => setName(e.target.value)}/></FormRow>
-                <FormRow label="Khmer name (optional)"><input className="field font-khmer" value={nameKh} onChange={e => setNameKh(e.target.value)}/></FormRow>
-                <div className="grid grid-cols-2 gap-3">
-                  <FormRow label="Supervising ministry">
-                    <select className="field" value={ministry} onChange={e => setMinistry(e.target.value)}>
-                      {SUPERVISING_MINISTRIES.map(m => <option key={m.code} value={m.code}>{m.code} — {m.name}</option>)}
-                    </select>
-                  </FormRow>
-                  <FormRow label="Type">
-                    <select className="field" value={type} onChange={e => setType(e.target.value)}>
-                      <option>Public</option><option>Private</option>
-                    </select>
-                  </FormRow>
-                </div>
+        <AddHeiOrScholarModal
+          heis={heis}
+          onClose={() => setShowAdd(false)}
+          onCreated={() => { setShowAdd(false); showToast("Created"); setTimeout(() => window.location.reload(), 700); }}
+          showToast={showToast}
+        />
+      )}
+      {editing && (
+        <EditHeiModal
+          hei={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); showToast("Institution updated"); setTimeout(() => window.location.reload(), 700); }}
+          showToast={showToast}
+        />
+      )}
+    </div>
+  );
+}
+
+function AddHeiOrScholarModal({ heis, onClose, onCreated, showToast }) {
+  const [kind, setKind] = useState("hei"); // hei | scholar
+  const [submitting, setSubmitting] = useState(false);
+
+  // HEI fields
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [nameKh, setNameKh] = useState("");
+  const [ministry, setMinistry] = useState("MoEYS");
+  const [type, setType] = useState("Public");
+  const [city, setCity] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+
+  // Scholar fields
+  const [sEmail, setSEmail] = useState("");
+  const [sName, setSName] = useState("");
+
+  async function submit(e) {
+    e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      if (kind === "hei") {
+        const res = await fetch("/api/heis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            shortCode: code,
+            name,
+            nameKhmer: nameKh || undefined,
+            ministry,
+            type,
+            city: city || undefined,
+            contactEmail: contactEmail || undefined,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Create failed (${res.status})`);
+        }
+      } else {
+        const res = await fetch("/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: sEmail,
+            name: sName || undefined,
+            role: "HEI_COORDINATOR",
+            heiCode: "INDEP",
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Create failed (${res.status})`);
+        }
+      }
+      onCreated();
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-panel" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+        <form onSubmit={submit} className="p-8">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h3 className="font-display text-2xl mb-1" style={{ fontWeight: 500 }}>Add HEI or Scholar</h3>
+              <p className="text-sm" style={{ color: "var(--ink-soft)" }}>Choose what you&apos;re adding below.</p>
+            </div>
+            <button type="button" onClick={onClose} className="btn-ghost btn" style={{ padding: 6 }}><X size={16}/></button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <button type="button" onClick={() => setKind("hei")} className="text-left p-4 rounded-md border transition-all" style={{
+              borderColor: kind === "hei" ? "var(--accent)" : "var(--line)",
+              background: kind === "hei" ? "rgba(10,42,107,0.05)" : "var(--bg)",
+            }}>
+              <div className="text-xs font-mono tracking-wider uppercase mb-1" style={{ color: kind === "hei" ? "var(--accent)" : "var(--ink-faint)", fontWeight: 600 }}>
+                Higher Education Institution
               </div>
-              <div className="flex justify-end gap-2 mt-6">
-                <button onClick={() => setShowAdd(false)} className="btn btn-ghost">Cancel</button>
-                <button onClick={submit} className="btn btn-primary">Register</button>
+              <div className="text-sm" style={{ color: "var(--ink-soft)" }}>A new university or institute (e.g., RUFA, NUM)</div>
+            </button>
+            <button type="button" onClick={() => setKind("scholar")} className="text-left p-4 rounded-md border transition-all" style={{
+              borderColor: kind === "scholar" ? "var(--accent)" : "var(--line)",
+              background: kind === "scholar" ? "rgba(10,42,107,0.05)" : "var(--bg)",
+            }}>
+              <div className="text-xs font-mono tracking-wider uppercase mb-1" style={{ color: kind === "scholar" ? "var(--accent)" : "var(--ink-faint)", fontWeight: 600 }}>
+                Individual Scholar (Abroad)
               </div>
+              <div className="text-sm" style={{ color: "var(--ink-soft)" }}>A Cambodian who studied at a foreign institution. Auto-assigned to INDEP.</div>
+            </button>
+          </div>
+
+          {kind === "hei" ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <FormRow label="Code (short) *" hint="3–6 letters; uppercase. e.g., RUPP">
+                  <input required className="field font-mono uppercase" value={code} onChange={e => setCode(e.target.value.toUpperCase())} maxLength={10} placeholder="RUFA"/>
+                </FormRow>
+                <FormRow label="Type">
+                  <select className="field" value={type} onChange={e => setType(e.target.value)}>
+                    <option>Public</option><option>Private</option><option>International</option>
+                  </select>
+                </FormRow>
+                <FormRow label="Ministry">
+                  <select className="field" value={ministry} onChange={e => setMinistry(e.target.value)}>
+                    {SUPERVISING_MINISTRIES.map(m => <option key={m.code} value={m.code}>{m.code}</option>)}
+                  </select>
+                </FormRow>
+              </div>
+              <FormRow label="Full name *">
+                <input required className="field" value={name} onChange={e => setName(e.target.value)} placeholder="Royal University of Fine Arts"/>
+              </FormRow>
+              <FormRow label="Khmer name (optional)">
+                <input className="field font-khmer" value={nameKh} onChange={e => setNameKh(e.target.value)}/>
+              </FormRow>
+              <div className="grid grid-cols-2 gap-3">
+                <FormRow label="City (optional)">
+                  <input className="field" value={city} onChange={e => setCity(e.target.value)} placeholder="Phnom Penh"/>
+                </FormRow>
+                <FormRow label="Contact email (optional)">
+                  <input type="email" className="field" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="library@example.edu.kh"/>
+                </FormRow>
+              </div>
+              <p className="text-xs italic" style={{ color: "var(--ink-faint)" }}>
+                After registering, use the Users tab to assign a coordinator to this institution.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <FormRow label="Email *" hint="Where the scholar will receive sign-in links and notifications.">
+                <input type="email" required className="field" value={sEmail} onChange={e => setSEmail(e.target.value)} placeholder="dara@stanford.edu"/>
+              </FormRow>
+              <FormRow label="Full name (optional)">
+                <input className="field" value={sName} onChange={e => setSName(e.target.value)} placeholder="Sok Dara"/>
+              </FormRow>
+              <p className="text-xs italic p-3 rounded" style={{ color: "var(--ink-faint)", background: "var(--bg)", borderLeft: "2px solid var(--line-strong)" }}>
+                The scholar will be added as an HEI Coordinator assigned to <strong>INDEP</strong> (Independent / Studied Abroad). They&apos;ll fill in their foreign institution name and country on their submission form.
+              </p>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 mt-8 pt-4 border-t" style={{ borderColor: "var(--line)" }}>
+            <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
+            <button type="submit" disabled={submitting} className="btn btn-primary">
+              {submitting ? "Adding…" : kind === "hei" ? "Register institution" : "Add scholar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditHeiModal({ hei, onClose, onSaved, showToast }) {
+  const [code, setCode] = useState(hei.code || "");
+  const [name, setName] = useState(hei.name || "");
+  const [nameKh, setNameKh] = useState(hei.nameKh || "");
+  const [ministry, setMinistry] = useState(hei.ministry || "MoEYS");
+  const [type, setType] = useState(hei.type || "Public");
+  const [city, setCity] = useState(hei.city || "");
+  const [contactEmail, setContactEmail] = useState(hei.contactEmail || "");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/heis/${hei.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shortCode: code,
+          name,
+          nameKhmer: nameKh,
+          ministry,
+          type,
+          city,
+          contactEmail,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Save failed (${res.status})`);
+      }
+      onSaved();
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-panel" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+        <form onSubmit={submit} className="p-8">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h3 className="font-display text-2xl mb-1" style={{ fontWeight: 500 }}>Edit institution</h3>
+              <p className="text-sm" style={{ color: "var(--ink-soft)" }}>Update the details of <span className="font-mono font-semibold" style={{ color: "var(--accent)" }}>{hei.code}</span>.</p>
+            </div>
+            <button type="button" onClick={onClose} className="btn-ghost btn" style={{ padding: 6 }}><X size={16}/></button>
+          </div>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <FormRow label="Code (short) *" hint="Changing this is safe — theses link by ID, not code.">
+                <input required className="field font-mono uppercase" value={code} onChange={e => setCode(e.target.value.toUpperCase())} maxLength={10}/>
+              </FormRow>
+              <FormRow label="Type">
+                <select className="field" value={type} onChange={e => setType(e.target.value)}>
+                  <option>Public</option><option>Private</option><option>International</option>
+                </select>
+              </FormRow>
+              <FormRow label="Ministry">
+                <select className="field" value={ministry} onChange={e => setMinistry(e.target.value)}>
+                  {SUPERVISING_MINISTRIES.map(m => <option key={m.code} value={m.code}>{m.code}</option>)}
+                </select>
+              </FormRow>
+            </div>
+            <FormRow label="Full name *">
+              <input required className="field" value={name} onChange={e => setName(e.target.value)}/>
+            </FormRow>
+            <FormRow label="Khmer name">
+              <input className="field font-khmer" value={nameKh} onChange={e => setNameKh(e.target.value)}/>
+            </FormRow>
+            <div className="grid grid-cols-2 gap-3">
+              <FormRow label="City">
+                <input className="field" value={city} onChange={e => setCity(e.target.value)}/>
+              </FormRow>
+              <FormRow label="Contact email">
+                <input type="email" className="field" value={contactEmail} onChange={e => setContactEmail(e.target.value)}/>
+              </FormRow>
             </div>
           </div>
-        </div>
-      )}
+
+          <div className="flex justify-end gap-2 mt-8 pt-4 border-t" style={{ borderColor: "var(--line)" }}>
+            <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
+            <button type="submit" disabled={submitting} className="btn btn-primary">
+              {submitting ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
