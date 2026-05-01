@@ -247,9 +247,11 @@ async function sSet(key, val) {
 // ======================================================================
 export default function AppClient({ initialTheses, initialHeis, currentUser }) {
   const fallbackHei = initialHeis?.[0]?.code || "RUPP";
-  // Role + heiContext come from the authenticated session (Slice 3a).
-  // Admins keep the role switcher so they can preview each role; everyone
-  // else is locked to their assigned role + HEI.
+  // Role + heiContext come from the authenticated session.
+  // - Anonymous visitor (currentUser === null): role="public", read-only catalogue
+  // - Admin: keeps the role switcher to preview each role
+  // - Everyone else: locked to their assigned role + HEI
+  const isAuthenticated = !!currentUser;
   const isAdmin = currentUser?.role === "admin";
   const [role, setRole] = useState(currentUser?.role || "public");
   const [heiContext, setHeiContext] = useState(currentUser?.heiCode || fallbackHei);
@@ -537,7 +539,7 @@ export default function AppClient({ initialTheses, initialHeis, currentUser }) {
   return (
     <div className="min-h-screen w-full" style={{ background: "var(--bg)" }}>
       <StyleTag />
-      <RoleBanner role={role} heiContext={heiContext} heis={heis} onChangeRole={setRoleAndSave} currentUser={currentUser} isAdmin={isAdmin} />
+      <RoleBanner role={role} heiContext={heiContext} heis={heis} onChangeRole={setRoleAndSave} currentUser={currentUser} isAdmin={isAdmin} isAuthenticated={isAuthenticated} />
       <Header role={role} view={view} setView={setView} theses={theses} heiContext={heiContext}/>
 
       <main className="max-w-7xl mx-auto px-6 md:px-10 pb-24">
@@ -735,7 +737,7 @@ function StyleTag() {
 // ======================================================================
 // ROLE BANNER (demo switcher — in production this is tied to SSO)
 // ======================================================================
-function RoleBanner({ role, heiContext, heis, onChangeRole, currentUser, isAdmin }) {
+function RoleBanner({ role, heiContext, heis, onChangeRole, currentUser, isAdmin, isAuthenticated }) {
   const roles = [
     { id: "public", label: "Public / Researcher", icon: BookOpen },
     { id: "hei", label: "HEI Submitter", icon: GraduationCap },
@@ -750,7 +752,7 @@ function RoleBanner({ role, heiContext, heis, onChangeRole, currentUser, isAdmin
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2 text-xs" style={{ color: "var(--ink-faint)" }}>
             <span className="font-mono tracking-[0.2em] uppercase" style={{ fontSize: "10px" }}>
-              {isAdmin ? "Viewing as" : "Signed in as"}
+              {isAuthenticated ? (isAdmin ? "Viewing as" : "Signed in as") : "Browsing as"}
             </span>
             <span className="font-mono tracking-[0.15em] uppercase font-semibold" style={{ color: "var(--accent)", fontSize: "10px" }}>
               {role === "hei" ? `${heiContext} Submitter` : roles.find(r => r.id === role)?.label}
@@ -763,7 +765,8 @@ function RoleBanner({ role, heiContext, heis, onChangeRole, currentUser, isAdmin
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             {/* Admins keep the role switcher to preview each role's view.
-                Other users only see their own role; switching is disabled. */}
+                Authenticated non-admins are locked to their session role.
+                Anonymous visitors stay on "public" — no switching either. */}
             {isAdmin && (
               <div className="flex items-center gap-1 flex-wrap">
                 {roles.map(r => {
@@ -786,17 +789,32 @@ function RoleBanner({ role, heiContext, heis, onChangeRole, currentUser, isAdmin
                 })}
               </div>
             )}
-            <button
-              onClick={() => signOut({ callbackUrl: "/" })}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md transition-all"
-              style={{
-                background: "transparent",
-                color: "var(--ink-soft)",
-                border: "1px solid var(--line-strong)",
-              }}
-              title="Sign out">
-              Sign out
-            </button>
+            {isAuthenticated ? (
+              <button
+                onClick={() => signOut({ callbackUrl: "/" })}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md transition-all"
+                style={{
+                  background: "transparent",
+                  color: "var(--ink-soft)",
+                  border: "1px solid var(--line-strong)",
+                }}
+                title="Sign out">
+                Sign out
+              </button>
+            ) : (
+              <a
+                href="/sign-in"
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md transition-all"
+                style={{
+                  background: "var(--accent)",
+                  color: "var(--accent-ink)",
+                  border: "1px solid var(--accent)",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                }}>
+                Sign in
+              </a>
+            )}
           </div>
         </div>
 

@@ -115,13 +115,14 @@ function dbRoleToPrototype(role: "ADMIN" | "REVIEWER" | "HEI_COORDINATOR"): stri
 }
 
 export default async function AppPage() {
-  // Slice 3a: real auth gate. Anyone hitting /app without a session is
-  // sent to /sign-in. Once they sign in, the magic link's redirectTo
-  // brings them back here.
+  // /app is dual-purpose:
+  // - Anonymous visitors get the public catalogue (BrowseView, approved
+  //   theses only) — no login needed; they're treated as role="public".
+  // - Authenticated users get role-specific views (HEI dashboard, Review
+  //   Queue, Admin records, etc.) based on their session.
+  // Privileged actions are still gated by API-side role checks (Slice 3c),
+  // so anonymous visitors can read but not write.
   const session = await auth();
-  if (!session?.user) {
-    redirect("/sign-in");
-  }
 
   const [dbTheses, dbHeis, currentUser] = await Promise.all([
     prisma.thesis.findMany({
@@ -132,16 +133,16 @@ export default async function AppPage() {
       where: { isActive: true },
       orderBy: { shortCode: "asc" },
     }),
-    // Re-fetch the user's own row so we get the canonical role + heiCode.
-    // session.user has these too but only at sign-in time; this catches
-    // mid-session role changes performed by an admin.
-    prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { hei: { select: { shortCode: true } } },
-    }),
+    session?.user?.id
+      ? prisma.user.findUnique({
+          where: { id: session.user.id },
+          include: { hei: { select: { shortCode: true } } },
+        })
+      : Promise.resolve(null),
   ]);
 
-  if (!currentUser || !currentUser.isActive) {
+  // Signed-in but deactivated → bounce them to sign-in with an error.
+  if (session?.user && (!currentUser || !currentUser.isActive)) {
     redirect("/sign-in?error=AccessDenied");
   }
 
@@ -152,13 +153,17 @@ export default async function AppPage() {
     <AppClient
       initialTheses={initialTheses}
       initialHeis={initialHeis}
-      currentUser={{
-        id: currentUser.id,
-        name: currentUser.name ?? currentUser.email,
-        email: currentUser.email,
-        role: dbRoleToPrototype(currentUser.role),
-        heiCode: currentUser.hei?.shortCode ?? null,
-      }}
+      currentUser={
+        currentUser
+          ? {
+              id: currentUser.id,
+              name: currentUser.name ?? currentUser.email,
+              email: currentUser.email,
+              role: dbRoleToPrototype(currentUser.role),
+              heiCode: currentUser.hei?.shortCode ?? null,
+            }
+          : null
+      }
     />
   );
 }
