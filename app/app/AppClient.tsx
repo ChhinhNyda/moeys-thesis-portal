@@ -2969,15 +2969,28 @@ function DashboardView({ theses, heis, role }) {
 
     const byYear = {}, byDegree = { Master: 0, PhD: 0 }, byLanguage = {};
     const byHei = {}, byMinistry = {}, keywordCounts = {};
+    const byCountry = {}, byForeignInstitution = {};
     let simTotal = 0, simCount = 0;
+    let abroadCount = 0;
 
     scoped.forEach(t => {
       byYear[t.year] = (byYear[t.year] || 0) + 1;
       if (byDegree[t.degree] != null) byDegree[t.degree]++;
       byLanguage[t.language || "Unknown"] = (byLanguage[t.language || "Unknown"] || 0) + 1;
-      byHei[t.hei] = (byHei[t.hei] || 0) + 1;
-      const hei = heis.find(h => h.code === t.hei);
-      if (hei?.ministry) byMinistry[hei.ministry] = (byMinistry[hei.ministry] || 0) + 1;
+      // Theses submitted via the INDEP HEI bucket (Cambodian scholars
+      // who studied abroad) are bucketed separately so the Cambodian-
+      // HEI charts stay focused on local institutions.
+      if (t.hei === "INDEP") {
+        abroadCount++;
+        const country = t.externalCountry || "Unknown";
+        byCountry[country] = (byCountry[country] || 0) + 1;
+        const inst = t.externalInstitutionName || "Unspecified institution";
+        byForeignInstitution[inst] = (byForeignInstitution[inst] || 0) + 1;
+      } else {
+        byHei[t.hei] = (byHei[t.hei] || 0) + 1;
+        const hei = heis.find(h => h.code === t.hei);
+        if (hei?.ministry) byMinistry[hei.ministry] = (byMinistry[hei.ministry] || 0) + 1;
+      }
       (t.keywords || []).forEach(kw => {
         const k = kw.toLowerCase();
         keywordCounts[k] = (keywordCounts[k] || 0) + 1;
@@ -3007,7 +3020,7 @@ function DashboardView({ theses, heis, role }) {
       totalAllTime: published.length,
       thisYear: published.filter(t => t.year === currentYear).length,
       activeInstitutions: Object.keys(byHei).length,
-      totalInstitutions: heis.length,
+      totalInstitutions: heis.filter(h => h.code !== "INDEP").length,
       yearSeries,
       byDegree: [
         { name: "Master's", value: byDegree.Master || 0 },
@@ -3021,6 +3034,9 @@ function DashboardView({ theses, heis, role }) {
       pipeline,
       approvalRate,
       phdShare: scoped.length > 0 ? Math.round(((byDegree.PhD || 0) / scoped.length) * 100) : 0,
+      abroadCount,
+      byCountry: Object.entries(byCountry).map(([k, v]) => ({ name: k, value: v })).sort((a,b) => b.value - a.value),
+      byForeignInstitution: Object.entries(byForeignInstitution).map(([k, v]) => ({ name: k, value: v })).sort((a,b) => b.value - a.value).slice(0, 10),
     };
   }, [theses, heis, range]);
 
@@ -3054,10 +3070,11 @@ function DashboardView({ theses, heis, role }) {
       </div>
 
       {/* Top KPI band */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
         <KpiBig label="Theses in view" value={metrics.total} sublabel={range === "all" ? `of ${metrics.totalAllTime} total` : `of ${metrics.totalAllTime} all-time`}/>
         <KpiBig label="This year" value={metrics.thisYear} sublabel={`new in ${new Date().getFullYear()}`}/>
         <KpiBig label="Active HEIs" value={metrics.activeInstitutions} sublabel={`of ${metrics.totalInstitutions} registered`}/>
+        <KpiBig label="Studied abroad" value={metrics.abroadCount} sublabel="non-Cambodian institutions"/>
         <KpiBig label="Doctoral share" value={`${metrics.phdShare}%`} sublabel="of selected set"/>
         <KpiBig label="Approval rate" value={`${metrics.approvalRate}%`} sublabel="processed records"/>
       </div>
@@ -3189,6 +3206,49 @@ function DashboardView({ theses, heis, role }) {
           )}
         </DashCard>
       </div>
+
+      {/* Cambodian Scholars Abroad — only shown when there are abroad theses */}
+      {metrics.abroadCount > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <DashCard title="Cambodian Scholars Abroad" subtitle={`${metrics.abroadCount} thesis${metrics.abroadCount === 1 ? "" : "es"} from non-Cambodian institutions, by country.`}>
+            {metrics.byCountry.length === 0 ? (
+              <EmptyChart/>
+            ) : (
+              <div className="space-y-2">
+                {metrics.byCountry.map(c => {
+                  const pct = Math.round((c.value / metrics.abroadCount) * 100);
+                  return (
+                    <div key={c.name}>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-semibold" style={{ color: "var(--ink)" }}>{c.name}</span>
+                        <span style={{ color: "var(--ink-soft)" }}>{c.value} <span style={{ color: "var(--ink-faint)" }}>· {pct}%</span></span>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--bg)" }}>
+                        <div className="h-full" style={{ width: `${pct}%`, background: "var(--gold)" }}/>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </DashCard>
+
+          <DashCard title="Foreign Institutions Represented" subtitle="Where Cambodian scholars completed their degrees abroad.">
+            {metrics.byForeignInstitution.length === 0 ? (
+              <EmptyChart/>
+            ) : (
+              <div className="space-y-1.5">
+                {metrics.byForeignInstitution.map(inst => (
+                  <div key={inst.name} className="flex items-center justify-between text-sm py-1" style={{ borderBottom: "1px dashed var(--line)" }}>
+                    <span style={{ color: "var(--ink)" }}>{inst.name}</span>
+                    <span className="font-mono text-xs" style={{ color: "var(--ink-faint)" }}>{inst.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </DashCard>
+        </div>
+      )}
 
       {/* Workflow health */}
       <DashCard title="Workflow & Quality Health" subtitle="Operational indicators from the review process." className="mt-6">
