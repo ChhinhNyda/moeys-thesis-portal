@@ -599,6 +599,9 @@ export default function AppClient({ initialTheses, initialHeis, currentUser, ini
             {view === "admin_heis" && role === "admin" && (
               <AdminHeis heis={heis} onAdd={addHei}/>
             )}
+            {view === "admin_users" && role === "admin" && (
+              <AdminUsers heis={heis} showToast={showToast}/>
+            )}
             {view === "dashboard" && (role === "admin" || role === "minister") && (
               <DashboardView theses={theses} heis={heis} role={role}/>
             )}
@@ -910,6 +913,7 @@ function Header({ role, view, setView, theses, heiContext }) {
               <div className={`nav-tab ${view === "dashboard" ? "active" : ""}`} onClick={() => setView("dashboard")}>Analytics Dashboard</div>
               <div className={`nav-tab ${view === "admin_records" ? "active" : ""}`} onClick={() => setView("admin_records")}>All Records</div>
               <div className={`nav-tab ${view === "admin_heis" ? "active" : ""}`} onClick={() => setView("admin_heis")}>Institutions</div>
+              <div className={`nav-tab ${view === "admin_users" ? "active" : ""}`} onClick={() => setView("admin_users")}>Users</div>
               <div className={`nav-tab ${view === "browse" ? "active" : ""}`} onClick={() => setView("browse")}>Public Archive</div>
             </>
           )}
@@ -2439,6 +2443,228 @@ function AdminHeis({ heis, onAdd }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ======================================================================
+// ADMIN USERS — manage who can sign in and what role they have
+// ======================================================================
+function AdminUsers({ heis, showToast }) {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+
+  async function refresh() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/users");
+      if (!res.ok) throw new Error(`Load failed (${res.status})`);
+      const data = await res.json();
+      setUsers(data.users || []);
+    } catch (e) {
+      showToast(`Failed to load users: ${e.message}`, "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { refresh(); }, []);
+
+  async function toggleActive(u) {
+    try {
+      const res = await fetch(`/api/users/${u.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !u.isActive }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Update failed (${res.status})`);
+      }
+      showToast(u.isActive ? "User deactivated" : "User activated");
+      refresh();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+  }
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter(u =>
+      (u.email || "").toLowerCase().includes(q) ||
+      (u.name || "").toLowerCase().includes(q) ||
+      (u.hei?.shortCode || "").toLowerCase().includes(q)
+    );
+  }, [users, search]);
+
+  const roleLabel = (r) => r === "ADMIN" ? "Admin" : r === "REVIEWER" ? "Reviewer" : "HEI Coordinator";
+
+  return (
+    <div className="mt-10">
+      <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
+        <div>
+          <div className="font-mono text-[10px] tracking-[0.25em] uppercase mb-2" style={{ color: "var(--ink-faint)" }}>Administrator</div>
+          <h2 className="font-display text-3xl md:text-4xl" style={{ fontWeight: 400 }}>
+            <span style={{ fontStyle: "italic", fontWeight: 300 }}>User</span> management
+          </h2>
+          <p className="mt-2 text-sm max-w-2xl" style={{ color: "var(--ink-soft)" }}>
+            Provision MoEYS staff, HEI Coordinators, and abroad-scholar accounts. Inactive users cannot sign in. Sign-in is invitation-only — no one can access the platform without a row here.
+          </p>
+        </div>
+        <button onClick={() => setShowAdd(true)} className="btn btn-primary"><Plus size={14}/> Add user</button>
+      </div>
+
+      <div className="mb-4 relative max-w-md">
+        <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--ink-faint)" }}/>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by email, name, or HEI…"
+          className="field"
+          style={{ paddingLeft: 32 }}
+        />
+      </div>
+
+      {loading ? (
+        <div className="py-16 text-center font-display italic text-lg" style={{ color: "var(--ink-faint)" }}>Loading…</div>
+      ) : filtered.length === 0 ? (
+        <div className="py-16 text-center border rounded-lg" style={{ borderColor: "var(--line)", background: "var(--bg-card)", color: "var(--ink-faint)" }}>
+          <div className="font-display italic text-lg">No users match your search.</div>
+        </div>
+      ) : (
+        <div className="border rounded-lg overflow-hidden" style={{ borderColor: "var(--line)", background: "var(--bg-card)" }}>
+          <table className="w-full text-sm">
+            <thead style={{ background: "var(--bg)" }}>
+              <tr style={{ borderBottom: "1px solid var(--line)" }}>
+                <th className="text-left px-4 py-3 font-mono text-[10px] tracking-[0.15em] uppercase" style={{ color: "var(--ink-faint)" }}>Email</th>
+                <th className="text-left px-4 py-3 font-mono text-[10px] tracking-[0.15em] uppercase" style={{ color: "var(--ink-faint)" }}>Name</th>
+                <th className="text-left px-4 py-3 font-mono text-[10px] tracking-[0.15em] uppercase" style={{ color: "var(--ink-faint)" }}>Role</th>
+                <th className="text-left px-4 py-3 font-mono text-[10px] tracking-[0.15em] uppercase" style={{ color: "var(--ink-faint)" }}>Institution</th>
+                <th className="text-left px-4 py-3 font-mono text-[10px] tracking-[0.15em] uppercase" style={{ color: "var(--ink-faint)" }}>Status</th>
+                <th className="text-right px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(u => (
+                <tr key={u.id} style={{ borderTop: "1px solid var(--line)" }}>
+                  <td className="px-4 py-3 font-mono text-xs">{u.email}</td>
+                  <td className="px-4 py-3">{u.name || <span style={{ color: "var(--ink-faint)" }}>—</span>}</td>
+                  <td className="px-4 py-3">
+                    <span className="font-mono text-xs px-2 py-0.5 rounded" style={{ background: u.role === "ADMIN" ? "rgba(168,118,26,0.15)" : u.role === "REVIEWER" ? "rgba(10,42,107,0.15)" : "var(--bg)", color: u.role === "ADMIN" ? "var(--gold)" : u.role === "REVIEWER" ? "var(--accent)" : "var(--ink-soft)" }}>
+                      {roleLabel(u.role)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs">{u.hei?.shortCode || <span style={{ color: "var(--ink-faint)" }}>—</span>}</td>
+                  <td className="px-4 py-3">
+                    {u.isActive ? (
+                      <span className="text-xs font-semibold" style={{ color: "var(--green)" }}>● Active</span>
+                    ) : (
+                      <span className="text-xs font-semibold" style={{ color: "var(--ink-faint)" }}>○ Inactive</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button onClick={() => toggleActive(u)} className="btn btn-ghost" style={{ padding: "5px 10px", fontSize: "12px" }}>
+                      {u.isActive ? "Deactivate" : "Activate"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showAdd && (
+        <AddUserModal
+          heis={heis}
+          onClose={() => setShowAdd(false)}
+          onCreated={() => { setShowAdd(false); refresh(); }}
+          showToast={showToast}
+        />
+      )}
+    </div>
+  );
+}
+
+function AddUserModal({ heis, onClose, onCreated, showToast }) {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [role, setRole] = useState("HEI_COORDINATOR");
+  const [heiCode, setHeiCode] = useState(heis[0]?.code || "");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          name: name || undefined,
+          role,
+          heiCode: role === "HEI_COORDINATOR" ? heiCode : undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Create failed (${res.status})`);
+      }
+      const data = await res.json();
+      showToast(data.reactivated ? "Existing user reactivated" : "User created");
+      onCreated();
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-panel" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+        <form onSubmit={submit} className="p-8">
+          <div className="flex items-start justify-between mb-6">
+            <h2 className="font-display text-2xl" style={{ fontWeight: 500 }}>Add user</h2>
+            <button type="button" onClick={onClose} className="btn-ghost btn" style={{ padding: 6 }}><X size={16}/></button>
+          </div>
+
+          <div className="space-y-5">
+            <FormRow label="Email *">
+              <input type="email" required className="field" value={email} onChange={e => setEmail(e.target.value)} placeholder="dara@stanford.edu"/>
+            </FormRow>
+            <FormRow label="Full name" hint="As you'd like it shown in the system. Optional.">
+              <input className="field" value={name} onChange={e => setName(e.target.value)} placeholder="Sok Dara"/>
+            </FormRow>
+            <FormRow label="Role *">
+              <select className="field" value={role} onChange={e => setRole(e.target.value)}>
+                <option value="HEI_COORDINATOR">HEI Coordinator</option>
+                <option value="REVIEWER">MoEYS Reviewer</option>
+                <option value="ADMIN">MoEYS Admin</option>
+              </select>
+            </FormRow>
+            {role === "HEI_COORDINATOR" && (
+              <FormRow label="Institution *" hint="For abroad scholars, choose INDEP.">
+                <select className="field" value={heiCode} onChange={e => setHeiCode(e.target.value)}>
+                  {heis.map(h => <option key={h.code} value={h.code}>{h.code} — {h.name}</option>)}
+                </select>
+              </FormRow>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-2 mt-8 pt-4 border-t" style={{ borderColor: "var(--line)" }}>
+            <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
+            <button type="submit" disabled={submitting} className="btn btn-primary">
+              {submitting ? "Adding…" : "Add user"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
