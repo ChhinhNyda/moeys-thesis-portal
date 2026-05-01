@@ -62,7 +62,12 @@ model User {
   role          UserRole  @default(HEI_COORDINATOR)
   heiId         String?
   hei           Hei?      @relation(fields: [heiId], references: [id])
-  isActive      Boolean   @default(true)
+  // Invitation-only: new accounts default to inactive. Admin must
+  // explicitly set isActive=true (via the seed script or admin UI)
+  // before a user can sign in. Auto-created rows from a magic-link
+  // attempt by an unknown email land here with isActive=false and are
+  // rejected by the signIn callback.
+  isActive      Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

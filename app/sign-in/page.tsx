@@ -88,9 +88,36 @@ export default async function SignInPage({
             </button>
           </form>
 
-          <p className="mt-8 text-sm" style={{ color: C.inkFaint }}>
-            Don&apos;t have an account? Account provisioning is handled by MoEYS — contact your institution&apos;s focal point or the ministry directly.
-          </p>
+          <div className="mt-8 space-y-6">
+            <div>
+              <p className="text-sm font-semibold mb-1" style={{ color: C.ink }}>Don&apos;t have an account?</p>
+              <p className="text-sm" style={{ color: C.inkFaint, lineHeight: 1.6 }}>
+                Account provisioning is handled by MoEYS — contact your institution&apos;s focal point or the ministry directly.
+              </p>
+            </div>
+
+            <div className="rounded-lg p-5" style={{ background: `${C.accent}10`, borderLeft: `3px solid ${C.accent}` }}>
+              <p className="text-sm font-semibold mb-2" style={{ color: C.ink }}>
+                Are you a Cambodian scholar studying abroad?
+              </p>
+              <p className="text-sm mb-3" style={{ color: C.inkSoft, lineHeight: 1.6 }}>
+                If you completed your Master&apos;s or PhD at an institution outside Cambodia and would like to deposit your thesis with the National Archive, please email DRI directly. We will verify your degree and create an account for you within a few business days.
+              </p>
+              <p className="text-xs font-semibold mb-1" style={{ color: C.inkSoft, letterSpacing: "0.05em", textTransform: "uppercase" }}>Please include in your email:</p>
+              <ul className="text-sm mb-3 ml-4 list-disc space-y-1" style={{ color: C.inkSoft, lineHeight: 1.6 }}>
+                <li>Full name (as it appears on your degree)</li>
+                <li>The institution where you studied + country</li>
+                <li>Degree level (Master&apos;s or PhD) and year of graduation</li>
+                <li>A scanned copy of your degree certificate or diploma</li>
+              </ul>
+              <p className="text-sm" style={{ color: C.ink }}>
+                Contact:{" "}
+                <a href="mailto:chhinh.nyda@moeys.gov.kh" style={{ color: C.primary, fontWeight: 600 }}>
+                  chhinh.nyda@moeys.gov.kh
+                </a>
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 

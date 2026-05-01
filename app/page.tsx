@@ -154,6 +154,20 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      <section style={{ borderTop: `1px solid ${C.inkFaint}30` }}>
+        <div className="mx-auto max-w-4xl px-6 py-12 text-center">
+          <p className="text-sm font-semibold mb-2" style={{ color: C.ink }}>
+            Studied abroad?
+          </p>
+          <p className="text-sm" style={{ color: C.inkSoft, lineHeight: 1.6 }}>
+            Cambodian scholars who completed their thesis at a foreign institution may deposit their work with the National Archive.{" "}
+            <a href="mailto:chhinh.nyda@moeys.gov.kh" style={{ color: C.primary, fontWeight: 600, textDecoration: "underline" }}>
+              Email DRI →
+            </a>
+          </p>
+        </div>
+      </section>
+
       <footer style={{ borderTop: `1px solid ${C.inkFaint}30` }}>
         <div className="mx-auto max-w-6xl px-6 py-6 text-sm" style={{ color: C.inkFaint }}>
           <p>© 2026 Ministry of Education, Youth and Sport · Pilot programme</p>

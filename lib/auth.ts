@@ -41,18 +41,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return session;
     },
-    // Block sign-in entirely if the user record was deactivated. Auth.js
-    // will return them to /sign-in with an error message.
+    // Invitation-only sign-in. Two rejection cases:
+    // - Unknown email — never provisioned by an admin. Magic-link
+    //   verification still runs (Auth.js's adapter creates a User row),
+    //   but isActive defaults to false at the schema level, so this
+    //   check rejects them. The orphaned row stays in the User table
+    //   for admin visibility ("people who tried to sign up").
+    // - Known email but explicitly deactivated by admin.
+    // Auth.js redirects rejected sign-ins to /sign-in?error=AccessDenied,
+    // which the sign-in page renders with a "contact DRI" message.
     async signIn({ user }) {
       if (!user.email) return false;
       const dbUser = await prisma.user.findUnique({
         where: { email: user.email },
         select: { isActive: true },
       });
-      // First-time logins create a User row from the magic-link verification,
-      // so dbUser may be null on the very first request — Auth.js will
-      // create it. Reject only if a row exists and is explicitly inactive.
-      if (dbUser && !dbUser.isActive) return false;
+      if (!dbUser || !dbUser.isActive) return false;
       return true;
     },
   },
