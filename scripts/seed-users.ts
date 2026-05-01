@@ -7,11 +7,12 @@ import "dotenv/config";
 import { prisma } from "../lib/prisma";
 
 const USERS = [
-  { email: "chhinhnyda@gmail.com",    role: "ADMIN" as const,            name: "MoEYS Admin",       heiCode: null },
-  { email: "reviewer@moeys.gov.kh",   role: "REVIEWER" as const,         name: "DRI Reviewer",      heiCode: null },
-  { email: "library@rupp.edu.kh",     role: "HEI_COORDINATOR" as const,  name: "RUPP Coordinator",  heiCode: "RUPP" },
-  { email: "research@itc.edu.kh",     role: "HEI_COORDINATOR" as const,  name: "ITC Coordinator",   heiCode: "ITC" },
-  { email: "research@rua.edu.kh",     role: "HEI_COORDINATOR" as const,  name: "RUA Coordinator",   heiCode: "RUA" },
+  { email: "chhinhnyda@gmail.com",    role: "ADMIN" as const,            name: "MoEYS Admin",        heiCode: null },
+  { email: "sophal.khl@gmail.com",    role: "REVIEWER" as const,         name: "Sophal Khl",         heiCode: null },
+  { email: "piseyry88@gmail.com",     role: "HEI_COORDINATOR" as const,  name: "Pisey RY (RUPP)",    heiCode: "RUPP" },
+  { email: "nyda.chhinh@gmail.com",   role: "HEI_COORDINATOR" as const,  name: "Nyda Chhinh (ITC)",  heiCode: "ITC" },
+  // RUA Coordinator not yet assigned — add a row here when the
+  // institution names a focal point.
 ];
 
 async function main() {
