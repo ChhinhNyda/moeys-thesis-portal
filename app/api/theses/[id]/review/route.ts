@@ -18,6 +18,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
 import { sendEmail } from "../../../../../lib/email";
+import { requireRole } from "../../../../../lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,10 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Only MoEYS Reviewers and Admins can decide on theses.
+  const { error } = await requireRole(["REVIEWER", "ADMIN"]);
+  if (error) return error;
+
   const { id } = await params;
 
   let body: { decision?: string; feedback?: string };

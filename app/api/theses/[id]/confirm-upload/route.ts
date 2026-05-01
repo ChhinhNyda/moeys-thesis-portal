@@ -8,6 +8,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
+import { requireRole } from "../../../../../lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,9 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error, user } = await requireRole(["HEI_COORDINATOR", "ADMIN"]);
+  if (error) return error;
+
   const { id } = await params;
 
   let body: { pdfFileKey?: string };
@@ -32,9 +36,15 @@ export async function POST(
     );
   }
 
-  const thesis = await prisma.thesis.findUnique({ where: { id }, select: { id: true } });
+  const thesis = await prisma.thesis.findUnique({ where: { id }, select: { id: true, heiId: true } });
   if (!thesis) {
     return NextResponse.json({ error: "Thesis not found" }, { status: 404 });
+  }
+  if (user.role === "HEI_COORDINATOR" && user.heiId !== thesis.heiId) {
+    return NextResponse.json(
+      { error: "You can only confirm uploads for your own institution's theses" },
+      { status: 403 }
+    );
   }
 
   await prisma.thesis.update({

@@ -23,6 +23,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
 import { sendEmail } from "../../../../../lib/email";
+import { requireRole } from "../../../../../lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,9 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error, user } = await requireRole(["HEI_COORDINATOR", "ADMIN"]);
+  if (error) return error;
+
   const { id } = await params;
 
   let body: Record<string, unknown>;
@@ -58,10 +62,18 @@ export async function POST(
 
   const existing = await prisma.thesis.findUnique({
     where: { id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, heiId: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Thesis not found" }, { status: 404 });
+  }
+
+  // HEI Coordinators can only edit theses owned by their own HEI
+  if (user.role === "HEI_COORDINATOR" && user.heiId !== existing.heiId) {
+    return NextResponse.json(
+      { error: "You can only edit theses for your own institution" },
+      { status: 403 }
+    );
   }
   if (existing.status !== "DRAFT" && existing.status !== "REVISION_REQUESTED") {
     return NextResponse.json(

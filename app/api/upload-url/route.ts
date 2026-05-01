@@ -12,6 +12,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { r2, R2_BUCKET } from "../../../lib/r2";
 import { prisma } from "../../../lib/prisma";
+import { requireRole } from "../../../lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,11 @@ const URL_TTL_SECONDS = 15 * 60;
 const ALLOWED_CONTENT_TYPES = ["application/pdf"];
 
 export async function POST(req: Request) {
+  // Only HEI Coordinators (for their own HEI) and Admins can request
+  // upload URLs. Public users have no business uploading PDFs.
+  const { error, user } = await requireRole(["HEI_COORDINATOR", "ADMIN"]);
+  if (error) return error;
+
   let body: { thesisId?: string; contentType?: string };
   try {
     body = await req.json();
@@ -40,10 +46,16 @@ export async function POST(req: Request) {
 
   const thesis = await prisma.thesis.findUnique({
     where: { id: thesisId },
-    select: { id: true },
+    select: { id: true, heiId: true },
   });
   if (!thesis) {
     return NextResponse.json({ error: "Thesis not found" }, { status: 404 });
+  }
+  if (user.role === "HEI_COORDINATOR" && user.heiId !== thesis.heiId) {
+    return NextResponse.json(
+      { error: "You can only upload PDFs for your own institution's theses" },
+      { status: 403 }
+    );
   }
 
   const key = `theses/${thesisId}.pdf`;

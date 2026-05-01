@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { sendEmail } from "../../../lib/email";
+import { requireRole } from "../../../lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,10 @@ function mapDegree(s: string | undefined): "MASTERS" | "PHD" {
 }
 
 export async function POST(req: Request) {
+  // Only HEI Coordinators (for their own HEI) and Admins can create theses.
+  const { error, user } = await requireRole(["HEI_COORDINATOR", "ADMIN"]);
+  if (error) return error;
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -48,6 +53,15 @@ export async function POST(req: Request) {
 
   const hei = await prisma.hei.findUnique({ where: { shortCode: heiCode } });
   if (!hei) return NextResponse.json({ error: `HEI '${heiCode}' not found` }, { status: 404 });
+
+  // HEI Coordinators can only submit on behalf of their own institution.
+  // Admins can submit on behalf of any HEI (e.g., for legacy import support).
+  if (user.role === "HEI_COORDINATOR" && user.heiId !== hei.id) {
+    return NextResponse.json(
+      { error: "You can only submit theses for your own institution" },
+      { status: 403 }
+    );
+  }
 
   const { first, last } = splitName(String(body.author || ""));
 

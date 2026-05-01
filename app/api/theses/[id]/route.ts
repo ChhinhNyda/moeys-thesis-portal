@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { prisma } from "../../../../lib/prisma";
 import { r2, R2_BUCKET } from "../../../../lib/r2";
+import { requireRole } from "../../../../lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -26,12 +27,29 @@ export async function DELETE(
   const { id } = await params;
   const mode = new URL(req.url).searchParams.get("mode") === "admin" ? "admin" : "orphan";
 
+  // Admin mode (hard delete + R2 cleanup) is restricted to ADMIN only.
+  // Orphan mode (cleanup of failed-submission rows with no PDF) is allowed
+  // to HEI Coordinators editing their own institution's theses, and Admins.
+  const allowedRoles = mode === "admin"
+    ? (["ADMIN"] as const)
+    : (["HEI_COORDINATOR", "ADMIN"] as const);
+  const { error, user } = await requireRole([...allowedRoles]);
+  if (error) return error;
+
   const thesis = await prisma.thesis.findUnique({
     where: { id },
-    select: { id: true, pdfFileKey: true, title: true },
+    select: { id: true, pdfFileKey: true, title: true, heiId: true },
   });
   if (!thesis) {
     return NextResponse.json({ error: "Thesis not found" }, { status: 404 });
+  }
+
+  // For orphan-mode HEI Coordinators, the row must belong to their HEI.
+  if (mode === "orphan" && user.role === "HEI_COORDINATOR" && user.heiId !== thesis.heiId) {
+    return NextResponse.json(
+      { error: "You can only clean up orphan rows for your own institution" },
+      { status: 403 }
+    );
   }
 
   if (mode === "orphan" && thesis.pdfFileKey) {
