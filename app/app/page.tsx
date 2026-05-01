@@ -114,7 +114,12 @@ function dbRoleToPrototype(role: "ADMIN" | "REVIEWER" | "HEI_COORDINATOR"): stri
   return "hei";
 }
 
-export default async function AppPage() {
+export default async function AppPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q: initialQuery = "" } = await searchParams;
   // /app is dual-purpose:
   // - Anonymous visitors get the public catalogue (BrowseView, approved
   //   theses only) — no login needed; they're treated as role="public".
@@ -153,6 +158,7 @@ export default async function AppPage() {
     <AppClient
       initialTheses={initialTheses}
       initialHeis={initialHeis}
+      initialQuery={initialQuery}
       currentUser={
         currentUser
           ? {

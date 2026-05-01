@@ -245,7 +245,7 @@ async function sSet(key, val) {
 // ======================================================================
 // MAIN APP
 // ======================================================================
-export default function AppClient({ initialTheses, initialHeis, currentUser }) {
+export default function AppClient({ initialTheses, initialHeis, currentUser, initialQuery }) {
   const fallbackHei = initialHeis?.[0]?.code || "RUPP";
   // Role + heiContext come from the authenticated session.
   // - Anonymous visitor (currentUser === null): role="public", read-only catalogue
@@ -550,7 +550,7 @@ export default function AppClient({ initialTheses, initialHeis, currentUser }) {
         ) : (
           <>
             {view === "browse" && (
-              <BrowseView theses={theses.filter(t => t.status === "published" || t.status === "embargoed")} heis={heis} onOpenDetail={setDetailId} publicMode={role === "public"}/>
+              <BrowseView theses={theses.filter(t => t.status === "published" || t.status === "embargoed")} heis={heis} onOpenDetail={setDetailId} publicMode={role === "public"} initialQuery={initialQuery}/>
             )}
             {view === "hei_dashboard" && role === "hei" && (
               <HEIDashboard
@@ -941,8 +941,10 @@ function StatusBadge({ status, size = "md" }) {
 // ======================================================================
 // PUBLIC BROWSE (shows only published/embargoed-metadata)
 // ======================================================================
-function BrowseView({ theses, heis, onOpenDetail, publicMode }) {
-  const [query, setQuery] = useState("");
+function BrowseView({ theses, heis, onOpenDetail, publicMode, initialQuery }) {
+  // Pre-fill the search box from the ?q= URL parameter so a search
+  // submitted from the landing page lands here already filtered.
+  const [query, setQuery] = useState(initialQuery || "");
   const [searchIn, setSearchIn] = useState({ title: true, author: true, abstract: true, keywords: true });
   const [selectedHeis, setSelectedHeis] = useState([]);
   const [degree, setDegree] = useState("All");
