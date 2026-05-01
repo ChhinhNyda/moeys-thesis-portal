@@ -32,6 +32,8 @@ function dbThesisToPrototype(t: {
   publicReleaseAt: Date | null;
   rejectionReason: string | null;
   pdfFileKey: string | null;
+  externalInstitutionName: string | null;
+  externalCountry: string | null;
   license: "ALL_RIGHTS_RESERVED" | "CC_BY" | "CC_BY_NC" | "CC_BY_NC_ND";
   releasePolicy: "IMMEDIATE" | "DELAY_6M" | "DELAY_1Y" | "DELAY_2Y" | "DELAY_3Y" | "DELAY_5Y";
   releaseReason: "PATENT" | "PUBLICATION" | "COMMERCIAL" | "SENSITIVE" | "OTHER" | null;
@@ -77,6 +79,8 @@ function dbThesisToPrototype(t: {
       t.visibility === "METADATA_ONLY" && t.publicReleaseAt ? ymd(t.publicReleaseAt) : undefined,
     reviewFeedback: t.rejectionReason ?? undefined,
     pdfFileKey: t.pdfFileKey,
+    externalInstitutionName: t.externalInstitutionName ?? "",
+    externalCountry: t.externalCountry ?? "",
     // Pre-fill the author-rights fields when the form opens for a
     // revision — otherwise the author would have to re-pick license and
     // release timing every time they resubmit.

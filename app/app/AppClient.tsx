@@ -337,6 +337,8 @@ export default function AppClient({ initialTheses, initialHeis, currentUser, ini
     releaseJustification: data.releaseJustification || undefined,
     licenseAcknowledged: !!data.licenseAcknowledged,
     authorshipConfirmed: !!data.authorshipConfirmed,
+    externalInstitutionName: data.externalInstitutionName || undefined,
+    externalCountry: data.externalCountry || undefined,
   });
 
   const submitThesis = async (data) => {
@@ -1203,7 +1205,15 @@ function DetailModal({ thesis, hei, ministry, role, onClose }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 mb-6 text-sm">
             <DetailField icon={<User size={14}/>} label="Author" value={<>{thesis.author}{thesis.authorKh && <span className="font-khmer ml-1" style={{ color: "var(--ink-faint)" }}>({thesis.authorKh})</span>}</>}/>
-            <DetailField icon={<Building2 size={14}/>} label="Institution" value={<><span className="font-mono font-semibold" style={{ color: "var(--accent)" }}>{thesis.hei}</span> · {hei?.name || thesis.hei}</>}/>
+            <DetailField
+              icon={<Building2 size={14}/>}
+              label="Institution"
+              value={
+                thesis.hei === "INDEP" && thesis.externalInstitutionName
+                  ? <><span className="font-mono font-semibold" style={{ color: "var(--accent)" }}>Studied abroad</span> · {thesis.externalInstitutionName}{thesis.externalCountry ? `, ${thesis.externalCountry}` : ""}</>
+                  : <><span className="font-mono font-semibold" style={{ color: "var(--accent)" }}>{thesis.hei}</span> · {hei?.name || thesis.hei}</>
+              }
+            />
             <DetailField icon={<Shield size={14}/>} label="Supervising Ministry" value={ministry ? `${ministry.code} — ${ministry.name}` : (hei?.ministry || "—")}/>
             <DetailField icon={<GraduationCap size={14}/>} label="Faculty / Department" value={thesis.faculty || "—"}/>
             <DetailField icon={<User size={14}/>} label="Supervisor" value={thesis.supervisor || "—"}/>
@@ -1463,6 +1473,8 @@ const FIELD_LABELS: Record<string, string> = {
   releasePolicy: "Release timing",
   releaseReason: "Reason for delayed release",
   releaseJustification: "Justification",
+  externalInstitutionName: "Institution name (abroad)",
+  externalCountry: "Country (abroad)",
   thesisMaster: "Thesis — Master Copy (PDF)",
   similarityReport: "Plagiarism Similarity Report (PDF)",
   licenseAcknowledged: "License acknowledgement",
@@ -1475,6 +1487,8 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
     hei: heiContext, faculty: "", degree: "Master", year: new Date().getFullYear(),
     supervisor: "", abstract: "", keywords: [], language: "English", callNumber: "",
     similarityScore: "",
+    externalInstitutionName: "",
+    externalCountry: "",
     license: "CC_BY",
     releasePolicy: "IMMEDIATE",
     releaseReason: "",
@@ -1510,6 +1524,10 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
     if (!form.abstract.trim()) e.abstract = "Required for submission";
     if (form.keywords.length < 3) e.keywords = "At least 3 keywords required";
     if (form.similarityScore === "" || form.similarityScore == null) e.similarityScore = "Similarity score required";
+    if (form.hei === "INDEP") {
+      if (!form.externalInstitutionName?.trim()) e.externalInstitutionName = "Institution name required for abroad submissions";
+      if (!form.externalCountry?.trim()) e.externalCountry = "Country required for abroad submissions";
+    }
     if (!form.license) e.license = "License choice required";
     if (!form.releasePolicy) e.releasePolicy = "Release timing required";
     if (form.releasePolicy && form.releasePolicy !== "IMMEDIATE" && !form.releaseReason) e.releaseReason = "Reason required when delaying public release";
@@ -1582,7 +1600,7 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
 
         <FormSection title="Academic">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <FormRow label="Institution *" error={errors.hei}>
+            <FormRow label="Institution *" error={errors.hei} hint={form.hei === "INDEP" ? "Use this only if the author studied abroad and is not represented by a Cambodian HEI." : undefined}>
               <select className="field" value={form.hei} onChange={e => setField("hei", e.target.value)}>
                 <option value="">Select…</option>
                 {heis.map(h => <option key={h.code} value={h.code}>{h.code} — {h.name}</option>)}
@@ -1599,6 +1617,16 @@ function SubmissionForm({ heis, heiContext, onSaveDraft, onSubmit, onCancel, ini
               </div>
             </FormRow>
           </div>
+          {form.hei === "INDEP" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 rounded-md" style={{ background: "var(--bg)", borderLeft: "2px solid var(--accent)" }}>
+              <FormRow label="Foreign institution name *" error={errors.externalInstitutionName}>
+                <input className="field" value={form.externalInstitutionName} onChange={e => setField("externalInstitutionName", e.target.value)} placeholder="e.g., Massachusetts Institute of Technology"/>
+              </FormRow>
+              <FormRow label="Country *" error={errors.externalCountry}>
+                <input className="field" value={form.externalCountry} onChange={e => setField("externalCountry", e.target.value)} placeholder="e.g., United States"/>
+              </FormRow>
+            </div>
+          )}
           <FormRow label="Faculty / Department *" error={errors.faculty}><input className="field" value={form.faculty} onChange={e => setField("faculty", e.target.value)} placeholder="e.g., Faculty of Engineering"/></FormRow>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <FormRow label="Supervisor *" error={errors.supervisor}><input className="field" value={form.supervisor} onChange={e => setField("supervisor", e.target.value)} placeholder="e.g., Dr. Chan Bora"/></FormRow>

@@ -209,6 +209,12 @@ model Thesis {
   // PDF storage reference (real R2 keys come in Phase 2.5)
   pdfFileKey String?
 
+  // For Cambodian scholars who studied abroad. heiId points at the
+  // special "INDEP" HEI bucket; the actual foreign institution name and
+  // country live here. Both are null for normal Cambodian-HEI submissions.
+  externalInstitutionName String?
+  externalCountry         String?
+
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

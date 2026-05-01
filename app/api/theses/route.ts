@@ -124,6 +124,14 @@ export async function POST(req: Request) {
       license,
       licenseAcknowledged: body.licenseAcknowledged === true,
       authorshipConfirmed: body.authorshipConfirmed === true,
+      externalInstitutionName:
+        heiCode === "INDEP" && body.externalInstitutionName
+          ? String(body.externalInstitutionName).trim()
+          : null,
+      externalCountry:
+        heiCode === "INDEP" && body.externalCountry
+          ? String(body.externalCountry).trim()
+          : null,
       visibility,
     },
     select: { id: true, status: true },

@@ -160,6 +160,14 @@ export async function POST(
       license,
       licenseAcknowledged: body.licenseAcknowledged === true,
       authorshipConfirmed: body.authorshipConfirmed === true,
+      externalInstitutionName:
+        heiCode === "INDEP" && body.externalInstitutionName
+          ? String(body.externalInstitutionName).trim()
+          : null,
+      externalCountry:
+        heiCode === "INDEP" && body.externalCountry
+          ? String(body.externalCountry).trim()
+          : null,
       visibility,
       // Clear the previous reviewer feedback so the next reviewer sees a
       // clean slate — the feedback was actioned by the resubmission.
