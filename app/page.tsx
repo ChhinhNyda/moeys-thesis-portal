@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "../lib/prisma";
+import ContactDri from "./ContactDri";
 
 // Re-fetch the live counts on every request so the landing page reflects
 // the latest archive size as soon as a thesis is approved.
@@ -160,11 +161,9 @@ export default async function LandingPage() {
             Studied abroad?
           </p>
           <p className="text-sm" style={{ color: C.inkSoft, lineHeight: 1.6 }}>
-            Cambodian scholars who completed their thesis at a foreign institution may deposit their work with the National Archive.{" "}
-            <a href="mailto:chhinh.nyda@moeys.gov.kh" style={{ color: C.primary, fontWeight: 600, textDecoration: "underline" }}>
-              Email DRI →
-            </a>
+            Cambodian scholars who completed their thesis at a foreign institution may deposit their work with the National Archive.
           </p>
+          <ContactDri />
         </div>
       </section>
 
