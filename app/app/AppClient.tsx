@@ -3351,7 +3351,10 @@ function Footer() {
           the student&apos;s supervisor(s), and the student(s) themselves.
         </p>
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="font-mono tracking-wider uppercase">Kingdom of Cambodia · MoEYS · Department of Research & Innovation</div>
+          <div>
+            <div className="font-mono tracking-wider uppercase">Kingdom of Cambodia · MoEYS · Department of Research & Innovation</div>
+            <div className="mt-1">Office: #23, Street 360, Boeng Keng Kang I, Phnom Penh, Cambodia</div>
+          </div>
           <div className="font-display italic">Custodians of scholarship, keepers of memory.</div>
         </div>
       </div>

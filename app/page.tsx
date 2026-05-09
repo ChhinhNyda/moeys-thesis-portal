@@ -177,6 +177,10 @@ export default async function LandingPage() {
             layers of review &mdash; by the awarding higher education institution,
             the student&apos;s supervisor(s), and the student(s) themselves.
           </p>
+          <p>
+            <span style={{ fontWeight: 600, color: C.inkSoft }}>DRI office:</span>{" "}
+            #23, Street 360, Boeng Keng Kang I, Phnom Penh, Cambodia
+          </p>
           <p>© 2026 Ministry of Education, Youth and Sport · Pilot programme</p>
         </div>
       </footer>
