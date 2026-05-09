@@ -168,7 +168,15 @@ export default async function LandingPage() {
       </section>
 
       <footer style={{ borderTop: `1px solid ${C.inkFaint}30` }}>
-        <div className="mx-auto max-w-6xl px-6 py-6 text-sm" style={{ color: C.inkFaint }}>
+        <div className="mx-auto max-w-6xl space-y-3 px-6 py-6 text-sm" style={{ color: C.inkFaint }}>
+          <p style={{ lineHeight: 1.6 }}>
+            <span style={{ fontWeight: 600, color: C.inkSoft }}>Disclaimer.</span>{" "}
+            This portal is operated by MoEYS&ndash;DRI as a knowledge management hub.
+            The author(s) of each thesis are solely responsible for the content, as
+            declared in their thesis. Academic quality is assured through multiple
+            layers of review &mdash; by the awarding higher education institution,
+            the student&apos;s supervisor(s), and the student(s) themselves.
+          </p>
           <p>© 2026 Ministry of Education, Youth and Sport · Pilot programme</p>
         </div>
       </footer>

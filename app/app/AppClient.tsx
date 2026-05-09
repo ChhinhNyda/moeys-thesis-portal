@@ -3341,9 +3341,19 @@ function OrnamentalDivider() {
 function Footer() {
   return (
     <footer className="border-t mt-20" style={{ borderColor: "var(--line)" }}>
-      <div className="max-w-7xl mx-auto px-6 md:px-10 py-10 text-xs flex flex-wrap items-center justify-between gap-4" style={{ color: "var(--ink-faint)" }}>
-        <div className="font-mono tracking-wider uppercase">Kingdom of Cambodia · MoEYS · Department of Research & Innovation</div>
-        <div className="font-display italic">Custodians of scholarship, keepers of memory.</div>
+      <div className="max-w-7xl mx-auto px-6 md:px-10 py-10 text-xs space-y-5" style={{ color: "var(--ink-faint)" }}>
+        <p style={{ lineHeight: 1.6 }}>
+          <span style={{ fontWeight: 600, color: "var(--ink-soft)" }}>Disclaimer.</span>{" "}
+          This portal is operated by MoEYS&ndash;DRI as a knowledge management hub.
+          The author(s) of each thesis are solely responsible for the content, as
+          declared in their thesis. Academic quality is assured through multiple
+          layers of review &mdash; by the awarding higher education institution,
+          the student&apos;s supervisor(s), and the student(s) themselves.
+        </p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="font-mono tracking-wider uppercase">Kingdom of Cambodia · MoEYS · Department of Research & Innovation</div>
+          <div className="font-display italic">Custodians of scholarship, keepers of memory.</div>
+        </div>
       </div>
     </footer>
   );
