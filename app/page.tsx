@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "../lib/prisma";
 import ContactDri from "./ContactDri";
+import GlossarySearch from "./GlossarySearch";
 
 // Re-fetch the live counts on every request so the landing page reflects
 // the latest archive size as soon as a thesis is approved.
@@ -152,6 +153,12 @@ export default async function LandingPage() {
               quality assured
             </p>
           </div>
+        </div>
+      </section>
+
+      <section style={{ borderTop: `1px solid ${C.inkFaint}30` }}>
+        <div className="mx-auto max-w-6xl px-6 py-12">
+          <GlossarySearch />
         </div>
       </section>
 

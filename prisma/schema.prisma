@@ -224,3 +224,24 @@ model Thesis {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// ─── Research Glossary (English ↔ Khmer) ────────────────────────────
+// Bilingual research terminology shown on the landing page as a quick
+// lookup for thesis authors and reviewers. Managed by admins through
+// the /app glossary admin view.
+
+model GlossaryTerm {
+  id                String   @id @default(cuid())
+  termEnglish       String
+  termKhmer         String
+  definitionEnglish String?  @db.Text
+  definitionKhmer   String?  @db.Text
+  // Optional grouping — e.g. "Methodology", "Statistics", "Writing".
+  // Free text so admins can introduce new categories without a migration.
+  category          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([termEnglish])
+  @@index([termKhmer])
+}

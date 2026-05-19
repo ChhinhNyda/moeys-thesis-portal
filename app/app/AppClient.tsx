@@ -602,6 +602,9 @@ export default function AppClient({ initialTheses, initialHeis, currentUser, ini
             {view === "admin_users" && role === "admin" && (
               <AdminUsers heis={heis} showToast={showToast}/>
             )}
+            {view === "admin_glossary" && role === "admin" && (
+              <AdminGlossary showToast={showToast}/>
+            )}
             {view === "dashboard" && (role === "admin" || role === "minister") && (
               <DashboardView theses={theses} heis={heis} role={role}/>
             )}
@@ -914,6 +917,7 @@ function Header({ role, view, setView, theses, heiContext }) {
               <div className={`nav-tab ${view === "admin_records" ? "active" : ""}`} onClick={() => setView("admin_records")}>All Records</div>
               <div className={`nav-tab ${view === "admin_heis" ? "active" : ""}`} onClick={() => setView("admin_heis")}>Institutions</div>
               <div className={`nav-tab ${view === "admin_users" ? "active" : ""}`} onClick={() => setView("admin_users")}>Users</div>
+              <div className={`nav-tab ${view === "admin_glossary" ? "active" : ""}`} onClick={() => setView("admin_glossary")}>Glossary</div>
               <div className={`nav-tab ${view === "browse" ? "active" : ""}`} onClick={() => setView("browse")}>Public Archive</div>
             </>
           )}
@@ -3333,6 +3337,236 @@ function EmptyChart() {
 
 function OrnamentalDivider() {
   return <div className="ornate-divider mb-10" style={{ color: "var(--gold)" }}>❦</div>;
+}
+
+// ======================================================================
+// ADMIN — RESEARCH GLOSSARY
+// ======================================================================
+// Bilingual research-term lookup. Admins curate the term list; the
+// landing page exposes a public search bar that hits /api/glossary/search.
+
+function AdminGlossary({ showToast }) {
+  const [terms, setTerms] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [filter, setFilter] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState(null);
+
+  const refresh = async () => {
+    try {
+      const res = await fetch("/api/glossary");
+      if (res.ok) {
+        const data = await res.json();
+        setTerms(data.terms || []);
+      } else {
+        showToast("Could not load glossary", "error");
+      }
+    } catch {
+      showToast("Could not load glossary", "error");
+    } finally {
+      setLoaded(true);
+    }
+  };
+  useEffect(() => { refresh(); }, []);
+
+  const filtered = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return terms;
+    return terms.filter(t =>
+      t.termEnglish.toLowerCase().includes(q) ||
+      t.termKhmer.includes(filter.trim()) ||
+      (t.category || "").toLowerCase().includes(q)
+    );
+  }, [terms, filter]);
+
+  const deleteTerm = async (id) => {
+    if (!confirm("Remove this glossary term?")) return;
+    try {
+      const res = await fetch(`/api/glossary/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        showToast("Term removed");
+        refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || "Could not delete", "error");
+      }
+    } catch {
+      showToast("Could not delete", "error");
+    }
+  };
+
+  return (
+    <div className="mt-10">
+      <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
+        <div>
+          <div className="font-mono text-[10px] tracking-[0.25em] uppercase mb-2" style={{ color: "var(--ink-faint)" }}>Bilingual lookup</div>
+          <h2 className="font-display text-3xl md:text-4xl" style={{ fontWeight: 400 }}>
+            <span style={{ fontStyle: "italic", fontWeight: 300 }}>Research</span> Glossary
+          </h2>
+          <p className="mt-2 text-sm" style={{ color: "var(--ink-soft)" }}>
+            {terms.length} term{terms.length === 1 ? "" : "s"} curated.
+            The public glossary search on the landing page reads from this list.
+          </p>
+        </div>
+        <button onClick={() => setShowAdd(true)} className="btn btn-primary"><Plus size={14}/> Add term</button>
+      </div>
+
+      <div className="mb-4 flex items-center gap-2 max-w-md">
+        <Search size={16} style={{ color: "var(--ink-faint)" }}/>
+        <input
+          type="text"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter by English, Khmer, or category…"
+          className="flex-1 px-3 py-2 text-sm rounded-md"
+          style={{ background: "var(--bg-card)", border: "1px solid var(--line)", color: "var(--ink)" }}
+        />
+      </div>
+
+      <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--line)", background: "var(--bg-card)" }}>
+        <table className="w-full text-sm">
+          <thead style={{ background: "var(--bg)" }}>
+            <tr className="font-mono text-[10px] tracking-[0.15em] uppercase" style={{ color: "var(--ink-faint)" }}>
+              <th className="text-left px-4 py-3">English</th>
+              <th className="text-left px-4 py-3">Khmer</th>
+              <th className="text-left px-4 py-3">Category</th>
+              <th className="text-left px-4 py-3">Definition</th>
+              <th className="text-right px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {!loaded ? (
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-xs italic" style={{ color: "var(--ink-faint)" }}>Loading…</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-xs italic" style={{ color: "var(--ink-faint)" }}>
+                {terms.length === 0 ? "No terms yet — add the first one." : "No matches."}
+              </td></tr>
+            ) : filtered.map(t => (
+              <tr key={t.id} className="border-t" style={{ borderColor: "var(--line)" }}>
+                <td className="px-4 py-3 align-top font-semibold" style={{ color: "var(--ink)" }}>{t.termEnglish}</td>
+                <td className="px-4 py-3 align-top font-khmer" style={{ color: "var(--ink)" }}>{t.termKhmer}</td>
+                <td className="px-4 py-3 align-top text-xs" style={{ color: "var(--ink-soft)" }}>{t.category || "—"}</td>
+                <td className="px-4 py-3 align-top text-xs" style={{ color: "var(--ink-soft)" }}>
+                  {t.definitionEnglish || t.definitionKhmer ? (
+                    <div className="space-y-0.5">
+                      {t.definitionEnglish && <div>{t.definitionEnglish}</div>}
+                      {t.definitionKhmer && <div className="font-khmer">{t.definitionKhmer}</div>}
+                    </div>
+                  ) : <span className="italic" style={{ color: "var(--ink-faint)" }}>—</span>}
+                </td>
+                <td className="px-4 py-3 text-right align-top whitespace-nowrap">
+                  <button onClick={() => setEditing(t)} className="btn btn-ghost" style={{ padding: "5px 10px", fontSize: "12px" }}>
+                    <Edit2 size={12}/> Edit
+                  </button>
+                  <button onClick={() => deleteTerm(t.id)} className="btn btn-ghost ml-2" style={{ padding: "5px 10px", fontSize: "12px", color: "var(--red)" }}>
+                    <Trash2 size={12}/> Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showAdd && (
+        <GlossaryTermModal
+          mode="create"
+          onClose={() => setShowAdd(false)}
+          onSaved={() => { setShowAdd(false); showToast("Term added"); refresh(); }}
+          showToast={showToast}
+        />
+      )}
+      {editing && (
+        <GlossaryTermModal
+          mode="edit"
+          term={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); showToast("Term updated"); refresh(); }}
+          showToast={showToast}
+        />
+      )}
+    </div>
+  );
+}
+
+function GlossaryTermModal({ mode, term, onClose, onSaved, showToast }) {
+  const [termEnglish, setTermEnglish] = useState(term?.termEnglish || "");
+  const [termKhmer, setTermKhmer] = useState(term?.termKhmer || "");
+  const [definitionEnglish, setDefinitionEnglish] = useState(term?.definitionEnglish || "");
+  const [definitionKhmer, setDefinitionKhmer] = useState(term?.definitionKhmer || "");
+  const [category, setCategory] = useState(term?.category || "");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!termEnglish.trim() || !termKhmer.trim()) {
+      showToast("Both English and Khmer terms are required", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const url = mode === "create" ? "/api/glossary" : `/api/glossary/${term.id}`;
+      const method = mode === "create" ? "POST" : "PATCH";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ termEnglish, termKhmer, definitionEnglish, definitionKhmer, category }),
+      });
+      if (res.ok) {
+        onSaved();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || "Could not save", "error");
+      }
+    } catch {
+      showToast("Could not save", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <div className="font-mono text-[10px] tracking-[0.25em] uppercase mb-1" style={{ color: "var(--ink-faint)" }}>
+              {mode === "create" ? "New term" : "Edit term"}
+            </div>
+            <h3 className="font-display text-2xl" style={{ fontWeight: 400 }}>
+              {mode === "create" ? "Add a glossary term" : "Update glossary term"}
+            </h3>
+          </div>
+          <button onClick={onClose} className="btn btn-ghost" style={{ padding: "5px 10px" }}><X size={14}/></button>
+        </div>
+
+        <form onSubmit={submit} className="space-y-4">
+          <FormRow label="English term *">
+            <input type="text" value={termEnglish} onChange={(e) => setTermEnglish(e.target.value)} className="field" placeholder="e.g. Hypothesis" required/>
+          </FormRow>
+          <FormRow label="Khmer term *">
+            <input type="text" value={termKhmer} onChange={(e) => setTermKhmer(e.target.value)} className="field font-khmer" placeholder="e.g. សម្មតិកម្ម" required/>
+          </FormRow>
+          <FormRow label="Category" hint="Optional grouping — e.g. Methodology, Statistics, Writing">
+            <input type="text" value={category} onChange={(e) => setCategory(e.target.value)} className="field" placeholder="e.g. Methodology"/>
+          </FormRow>
+          <FormRow label="English definition" hint="Optional">
+            <textarea value={definitionEnglish} onChange={(e) => setDefinitionEnglish(e.target.value)} className="field" rows={2}/>
+          </FormRow>
+          <FormRow label="Khmer definition" hint="Optional">
+            <textarea value={definitionKhmer} onChange={(e) => setDefinitionKhmer(e.target.value)} className="field font-khmer" rows={2}/>
+          </FormRow>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
+            <button type="submit" disabled={saving} className="btn btn-primary">
+              {saving ? "Saving…" : mode === "create" ? "Add term" : "Save changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
 
 // ======================================================================
