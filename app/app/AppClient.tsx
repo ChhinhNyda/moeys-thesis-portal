@@ -2,7 +2,7 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
 import { signOut } from "next-auth/react";
-import { Search, Plus, Filter, X, Edit2, Trash2, BookOpen, GraduationCap, Building2, Calendar, User, FileText, ChevronDown, ArrowUpDown, Check, AlertCircle, Library, Shield, Clock, CheckCircle2, XCircle, RotateCcw, Send, Eye, Users, FileCheck, AlertTriangle, ClipboardList, MessageSquare, Lock, Upload, Paperclip, File as FileIcon, Download, Landmark, TrendingUp, Activity, Globe } from "lucide-react";
+import { Search, Plus, Filter, X, Edit2, Trash2, BookOpen, GraduationCap, Building2, Calendar, User, FileText, ChevronDown, ArrowUpDown, Check, AlertCircle, Library, Shield, Clock, CheckCircle2, XCircle, RotateCcw, Send, Eye, Users, FileCheck, AlertTriangle, ClipboardList, MessageSquare, Lock, Upload, Paperclip, File as FileIcon, Download, Landmark, TrendingUp, Activity, Globe, RefreshCw } from "lucide-react";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 
 // In-session file blob cache — the prototype holds real File objects here so
@@ -3352,6 +3352,18 @@ function AdminGlossary({ showToast }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState(null);
 
+  // Google Sheet sync — URL persists in localStorage so the admin only has
+  // to paste it the first time. Sync upserts by termEnglish; missing rows
+  // are left alone (never auto-delete).
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState(null);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSheetUrl(localStorage.getItem("moeys_glossary_sheet_url") || "");
+    }
+  }, []);
+
   const refresh = async () => {
     try {
       const res = await fetch("/api/glossary");
@@ -3368,6 +3380,41 @@ function AdminGlossary({ showToast }) {
     }
   };
   useEffect(() => { refresh(); }, []);
+
+  const syncFromSheet = async () => {
+    const url = sheetUrl.trim();
+    if (!url) {
+      showToast("Paste your Google Sheet URL first", "error");
+      return;
+    }
+    setSyncing(true);
+    try {
+      localStorage.setItem("moeys_glossary_sheet_url", url);
+      const res = await fetch("/api/glossary/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sheetUrl: url }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "Sync failed", "error");
+      } else {
+        setLastSync({
+          imported: data.imported,
+          updated: data.updated,
+          skipped: (data.skipped || []).length,
+          skippedDetails: data.skipped || [],
+          ts: Date.now(),
+        });
+        showToast(`Synced — ${data.imported} added, ${data.updated} updated`);
+        refresh();
+      }
+    } catch {
+      showToast("Sync failed (network error)", "error");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -3409,6 +3456,54 @@ function AdminGlossary({ showToast }) {
           </p>
         </div>
         <button onClick={() => setShowAdd(true)} className="btn btn-primary"><Plus size={14}/> Add term</button>
+      </div>
+
+      <div className="mb-4 rounded-lg border p-4" style={{ borderColor: "var(--line)", background: "var(--bg-card)" }}>
+        <div className="font-mono text-[10px] tracking-[0.15em] uppercase mb-1" style={{ color: "var(--ink-faint)" }}>
+          Sync from Google Sheet
+        </div>
+        <div className="text-xs mb-3" style={{ color: "var(--ink-soft)" }}>
+          Set your sheet to <span style={{ fontWeight: 600 }}>Anyone with the link can view</span>, then paste the URL.
+          Columns: <span className="font-mono">termEnglish, termKhmer</span> (required) plus optional
+          <span className="font-mono"> definitionEnglish, definitionKhmer, category</span>.
+          Sync adds new rows and updates existing ones (matched on English term); terms only in the portal stay put.
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <input
+            type="text"
+            value={sheetUrl}
+            onChange={(e) => setSheetUrl(e.target.value)}
+            placeholder="https://docs.google.com/spreadsheets/d/…/edit?gid=0"
+            className="flex-1 px-3 py-2 text-sm rounded-md min-w-[260px]"
+            style={{ background: "var(--bg)", border: "1px solid var(--line)", color: "var(--ink)" }}
+            disabled={syncing}
+          />
+          <button
+            onClick={syncFromSheet}
+            disabled={syncing}
+            className="btn btn-primary whitespace-nowrap"
+          >
+            <RefreshCw size={14} className={syncing ? "animate-spin" : ""}/>
+            {syncing ? "Syncing…" : "Sync now"}
+          </button>
+        </div>
+        {lastSync && (
+          <div className="text-xs mt-3" style={{ color: "var(--ink-soft)" }}>
+            Last sync: <span style={{ fontWeight: 600 }}>{lastSync.imported}</span> added,
+            {" "}<span style={{ fontWeight: 600 }}>{lastSync.updated}</span> updated
+            {lastSync.skipped > 0 && <>, <span style={{ fontWeight: 600 }}>{lastSync.skipped}</span> skipped</>}.
+            {lastSync.skipped > 0 && lastSync.skippedDetails && (
+              <details className="mt-1">
+                <summary className="cursor-pointer" style={{ color: "var(--ink-faint)" }}>Show skipped rows</summary>
+                <ul className="mt-1 ml-4 list-disc">
+                  {lastSync.skippedDetails.map((s, i) => (
+                    <li key={i}>Row {s.row}: {s.reason}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="mb-4 flex items-center gap-2 max-w-md">
