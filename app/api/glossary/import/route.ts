@@ -126,6 +126,22 @@ function canonicalHeader(h: string): string | null {
 }
 
 export async function POST(req: Request) {
+  try {
+    return await handle(req);
+  } catch (e) {
+    // Top-level safety net: any uncaught error becomes a JSON 500 so the
+    // browser's res.json() call doesn't blow up on an HTML error page and
+    // surface as a generic "network error" to the admin.
+    console.error("[glossary/import] uncaught:", e);
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json(
+      { error: `Sync failed on the server: ${message}` },
+      { status: 500 }
+    );
+  }
+}
+
+async function handle(req: Request) {
   const { error } = await requireRole(["ADMIN"]);
   if (error) return error;
 
@@ -240,22 +256,40 @@ export async function POST(req: Request) {
     const definitionKhmer = get(row, "definitionKhmer") || null;
     const category = get(row, "category") || null;
 
-    const existing = await prisma.glossaryTerm.findFirst({
-      where: { termEnglish: { equals: termEnglish, mode: "insensitive" } },
-      select: { id: true },
-    });
-
-    if (existing) {
-      await prisma.glossaryTerm.update({
-        where: { id: existing.id },
-        data: { termEnglish, termKhmer, definitionEnglish, definitionKhmer, category },
+    try {
+      const existing = await prisma.glossaryTerm.findFirst({
+        where: { termEnglish: { equals: termEnglish, mode: "insensitive" } },
+        select: { id: true },
       });
-      updated++;
-    } else {
+
+      if (existing) {
+        await prisma.glossaryTerm.update({
+          where: { id: existing.id },
+          data: { termEnglish, termKhmer, definitionEnglish, definitionKhmer, category },
+        });
+        updated++;
+        continue;
+      }
+    } catch (e) {
+      console.error(`[glossary/import] row ${r + 1} (${termEnglish}) DB error:`, e);
+      skipped.push({
+        row: r + 1,
+        reason: `database error: ${e instanceof Error ? e.message : String(e)}`,
+      });
+      continue;
+    }
+
+    try {
       await prisma.glossaryTerm.create({
         data: { termEnglish, termKhmer, definitionEnglish, definitionKhmer, category },
       });
       imported++;
+    } catch (e) {
+      console.error(`[glossary/import] row ${r + 1} (${termEnglish}) DB error:`, e);
+      skipped.push({
+        row: r + 1,
+        reason: `database error: ${e instanceof Error ? e.message : String(e)}`,
+      });
     }
   }
 
