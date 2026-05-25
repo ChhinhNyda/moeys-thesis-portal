@@ -144,10 +144,10 @@ export async function POST(req: Request) {
   const csvUrl = toCsvUrl(rawUrl);
 
   // Fetch with a 30s ceiling so a hung Google response doesn't tie up the
-  // request indefinitely. We use redirect: "manual" because Google issues a
-  // 307 → login page when the sheet isn't publicly shared; following the
-  // redirect would land us on HTML and produce a confusing parser error,
-  // whereas catching the 3xx lets us report the actual problem.
+  // request indefinitely. We follow redirects (Google uses a benign 307 to
+  // route published sheets through its CDN), then rely on the HTML-detection
+  // check further down to distinguish a real CSV body from a login page that
+  // would land us here if the sheet isn't publicly shared.
   let csvText: string;
   try {
     const controller = new AbortController();
@@ -155,22 +155,12 @@ export async function POST(req: Request) {
     const res = await fetch(csvUrl, {
       signal: controller.signal,
       cache: "no-store",
-      redirect: "manual",
     });
     clearTimeout(timeout);
-    if (res.status >= 300 && res.status < 400) {
-      return NextResponse.json(
-        {
-          error:
-            "The sheet is not shared publicly (Google redirected the request). Open the sheet's Share panel, set 'General access' to 'Anyone with the link', role 'Viewer', then click Sync again.",
-        },
-        { status: 400 }
-      );
-    }
     if (!res.ok) {
       return NextResponse.json(
         {
-          error: `Could not fetch the sheet (HTTP ${res.status}). Make sure the sheet is shared as 'Anyone with the link can view' and the URL is correct.`,
+          error: `Could not fetch the sheet (HTTP ${res.status}). Make sure the sheet is shared as 'Anyone with the link can view' (or published to the web), and the URL is correct.`,
         },
         { status: 400 }
       );
