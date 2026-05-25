@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Search } from "lucide-react";
 
 const C = {
   primary: "#0A2A6B",
@@ -81,15 +82,22 @@ export default function GlossarySearch() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Try “hypothesis”, “សម្មតិកម្ម”, “sample”…"
-          className="w-full rounded-md px-4 py-3 text-base"
+          placeholder="សន្ទានុក្រមស្រាវជ្រាវ"
+          className="w-full rounded-full pl-6 pr-14 py-3.5 text-base shadow-sm focus:outline-none"
           style={{
-            background: C.surface,
+            background: "#FFFFFF",
             border: `1px solid ${C.inkFaint}80`,
             color: C.ink,
           }}
           aria-label="Search the research glossary"
         />
+        <div
+          className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2"
+          style={{ color: C.inkFaint }}
+          aria-hidden="true"
+        >
+          <Search size={20} />
+        </div>
       </div>
 
       {showResultsPanel && (
