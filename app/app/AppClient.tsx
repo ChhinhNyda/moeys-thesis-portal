@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { signOut } from "next-auth/react";
 import { Search, Plus, Filter, X, Edit2, Trash2, BookOpen, GraduationCap, Building2, Calendar, User, FileText, ChevronDown, ArrowUpDown, Check, AlertCircle, Library, Shield, Clock, CheckCircle2, XCircle, RotateCcw, Send, Eye, Users, FileCheck, AlertTriangle, ClipboardList, MessageSquare, Lock, Upload, Paperclip, File as FileIcon, Download, Landmark, TrendingUp, Activity, Globe, RefreshCw } from "lucide-react";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import GlossarySearch from "../GlossarySearch";
 
 // In-session file blob cache — the prototype holds real File objects here so
 // HEI users and reviewers can preview uploaded files in the same browser
@@ -998,6 +999,9 @@ function BrowseView({ theses, heis, onOpenDetail, publicMode, initialQuery }) {
 
   return (
     <div className="mt-8">
+      <div className="mb-8 pb-8" style={{ borderBottom: "1px solid var(--line)" }}>
+        <GlossarySearch />
+      </div>
       <div className="relative mb-3">
         <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "var(--ink-faint)" }}/>
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search titles, authors, abstracts, keywords…" className="field" style={{ paddingLeft: "44px", paddingRight: "16px", height: "48px", fontSize: "15px" }}/>

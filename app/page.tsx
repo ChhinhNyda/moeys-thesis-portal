@@ -123,7 +123,17 @@ export default async function LandingPage() {
 
       <section
         style={{
+          borderTop: `1px solid ${C.inkFaint}30`,
           background: C.surface,
+        }}
+      >
+        <div className="mx-auto max-w-6xl px-6 py-10">
+          <GlossarySearch />
+        </div>
+      </section>
+
+      <section
+        style={{
           borderTop: `1px solid ${C.inkFaint}30`,
           borderBottom: `1px solid ${C.inkFaint}30`,
         }}
@@ -153,12 +163,6 @@ export default async function LandingPage() {
               quality assured
             </p>
           </div>
-        </div>
-      </section>
-
-      <section style={{ borderTop: `1px solid ${C.inkFaint}30` }}>
-        <div className="mx-auto max-w-6xl px-6 py-12">
-          <GlossarySearch />
         </div>
       </section>
 
