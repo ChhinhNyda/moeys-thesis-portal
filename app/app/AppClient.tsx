@@ -983,7 +983,11 @@ function BrowseView({ theses, heis, onOpenDetail, publicMode, initialQuery }) {
           searchIn.abstract ? t.abstract : "",
           searchIn.keywords ? (t.keywords || []).join(" ") : "",
         ].join(" ").toLowerCase();
-        if (!haystack.includes(q)) return false;
+        // Match each whitespace-separated term independently (AND, any order)
+        // so name searches succeed regardless of word order — e.g. "Hang
+        // Chuon Naron" finds an author stored as "Chuon Naron Hang".
+        const terms = q.split(/\s+/).filter(Boolean);
+        if (!terms.every((term) => haystack.includes(term))) return false;
       }
       return true;
     });
